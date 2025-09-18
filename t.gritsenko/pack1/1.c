@@ -32,7 +32,7 @@ int main(int argc, char *argv[]) {
 			break;
 		case 'u':
 			getrlimit(RLIMIT_FSIZE, &rlp);
-			printf("ulimit is %ld\n", rlp.rlim_max);
+			printf("ulimit is %lu\n", rlp.rlim_max);
 			printf("(%ld)", ulimit(UL_GETFSIZE));
 			break;
 		case 'U':
