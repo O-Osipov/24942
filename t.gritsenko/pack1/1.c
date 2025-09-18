@@ -4,14 +4,13 @@
 #include <sys/types.h>
 #include <sys/time.h>
 #include <sys/resource.h>
-#include <ulimit.h>
 
 
 int main(int argc, char *argv[]) {
 	
 	char options[] = "ispuU:";	
 	int c;
-	char *U_ptr;
+	char *U_ptr, *C_ptr;
 	struct rlimit rlp;
 	
 
@@ -32,8 +31,7 @@ int main(int argc, char *argv[]) {
 			break;
 		case 'u':
 			getrlimit(RLIMIT_FSIZE, &rlp);
-			printf("ulimit is %lu\n(%lu)\n\n", rlp.rlim_max, rlp.rlim_cur);
-			printf("(%ld)\n", ulimit(UL_GETFSIZE));
+			printf("ulimit is %lu\n", rlp.rlim_max);
 			break;
 		case 'U':
 			U_ptr = optarg;
@@ -42,6 +40,15 @@ int main(int argc, char *argv[]) {
 			if (setrlimit(RLIMIT_FSIZE, &rlp) == 0)
 				printf("ulimit value has changed.\n");
 			break;
+		case 'c':
+			getrlimit(RLIMIT_CORE, &rlp);
+			printf("max core-file size is %lu\n", rlp.rlim_max);
+		case 'C':
+			C_ptr = optarg;
+			rlp.rlim_cur = atol(C_ptr);
+			rlp.rlim_max = rlp.rlim_cur;
+			if (setrlimit(RLIMIT_CORE, &rlp) == 0)
+				printf("max core-file size has changed.\n");
 		default:
 			break;
 		}
