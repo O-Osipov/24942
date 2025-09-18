@@ -6,7 +6,7 @@
 
 int main(int argc, char *argv[]) {
 	
-	char options[] = "ispu2";	
+	char options[] = "ispu";	
 	int c;
 	char *s_ptr;
 
