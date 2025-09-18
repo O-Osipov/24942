@@ -6,7 +6,7 @@
 
 int main(int argc, char *argv[]) {
 	
-	char options[] = "is:p";	
+	char options[] = "ispu2";	
 	int c;
 	char *s_ptr;
 
@@ -14,9 +14,8 @@ int main(int argc, char *argv[]) {
 
 		switch (c) {
 		case 'i':
-			uid_t id = getuid();
 			printf("uid: %u\neuid: %u\ngid: %u\negid: %u\n", 
-				id, geteuid(), getgid(), getegid());
+				getuid(), geteuid(), getgid(), getegid());
 			break;
 		case 's':
 			if (setpgid(0, 0) == 0)
@@ -24,6 +23,8 @@ int main(int argc, char *argv[]) {
 		case 'p':
 			printf("pid: %d\nppid: %d\npgrp: %d\n", 
 				getpid(), getppid(), getpgrp());
+		case 'u':
+			printf("ulimit is %ld", ulimit(UL_GETFSIZE));
 		default:
 			break;
 		}
