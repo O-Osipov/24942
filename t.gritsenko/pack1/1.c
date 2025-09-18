@@ -24,7 +24,7 @@ int main(int argc, char *argv[]) {
 			printf("pid: %d\nppid: %d\npgrp: %d\n", 
 				getpid(), getppid(), getpgrp());
 		case 'u':
-			printf("ulimit is %ld", ulimit(UL_GETFSIZE));
+			ulimit(UL_GETFSIZE);
 		default:
 			break;
 		}
