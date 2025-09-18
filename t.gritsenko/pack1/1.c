@@ -36,13 +36,13 @@ int main(int argc, char *argv[]) {
 		case 'U':
 			U_ptr = optarg;
 			rlp.rlim_cur = atol(U_ptr);
-			//rlp.rlim_max = atol(U_ptr);
+			rlp.rlim_max = atol(U_ptr);
 			if (setrlimit(RLIMIT_FSIZE, &rlp) == 0)
 				printf("ulimit value has changed.\n");
 			break;
 		case 'c':
 			getrlimit(RLIMIT_CORE, &rlp);
-			printf("max core-file size is %lu\n", rlp.rlim_max);
+			printf("max core-file size is %lu or %lu", rlp.rlim_max, rlp.rlim_cur);
 		case 'C':
 			C_ptr = optarg;
 			rlp.rlim_cur = atol(C_ptr);
