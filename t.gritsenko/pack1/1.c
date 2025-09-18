@@ -2,14 +2,18 @@
 #include <stdlib.h>
 #include <unistd.h>
 #include <sys/types.h>
+#include <sys/time.h>
+#include <sys/resource.h>
 #include <ulimit.h>
+
 
 int main(int argc, char *argv[]) {
 	
 	char options[] = "ispuU:";	
 	int c;
 	char *U_ptr;
-	long new_fsize;
+	struct rlimit rlp;
+	
 
 	while ((c = getopt(argc, argv, options)) != EOF) {
 
@@ -27,12 +31,14 @@ int main(int argc, char *argv[]) {
 				getpid(), getppid(), getpgrp());
 			break;
 		case 'u':
-			printf("ulimit is %ld\n", ulimit(UL_GETFSIZE));
+			getrlimit(RLIMIT_FSIZE, &rlp);
+			printf("ulimit is %ld\n", rlp.rlim_max);
+			printf("(%ld)", ulimit(UL_GETFSIZE));
 			break;
 		case 'U':
 			U_ptr = optarg;
-			new_fsize = atol(U_ptr);
-			if (ulimit(UL_SETFSIZE, new_fsize) == new_fsize)
+			rlp.rlim_max = atol(U_ptr);
+			if (setrlimit(RLIMIT_FSIZE, &rlp) == 0)
 				printf("ulimit value has changed.\n");
 			break;
 		default:
