@@ -8,7 +8,7 @@
 
 int main(int argc, char *argv[]) {
 	
-	char options[] = "ispuU:";	
+	char options[] = "ispuU:cC:";	
 	int c;
 	char *U_ptr, *C_ptr;
 	struct rlimit rlp;
