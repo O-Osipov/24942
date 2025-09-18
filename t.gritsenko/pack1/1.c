@@ -69,7 +69,7 @@ int main(int argc, char *argv[]) {
 			env_name = strtok(V_ptr, "=");
 			env_val = strtok(V_ptr, "=");
 			if (setenv(env_name, env_val, 1) == 0) {
-				printf("variable %s is set to $s", env_name, env_val);
+				printf("variable %s is set to %s\n", env_name, env_val);
 			}
 		default:
 			break;
