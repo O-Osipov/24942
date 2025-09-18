@@ -67,7 +67,7 @@ int main(int argc, char *argv[]) {
 		case 'V':
 			V_ptr = optarg;
 			env_name = strtok(V_ptr, "=");
-			env_val = strtok(V_ptr, "=");
+			env_val = strtok(NULL, "=");
 			if (setenv(env_name, env_val, 1) == 0) {
 				printf("variable %s is set to %s\n", env_name, env_val);
 			}
