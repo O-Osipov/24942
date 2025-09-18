@@ -5,6 +5,7 @@
 #include <sys/time.h>
 #include <sys/resource.h>
 #include <ulimit.h>
+#include <string.h>
 
 #define PATH_MAX_SIZE 1024
 
@@ -12,9 +13,9 @@ extern char **environ;
 
 int main(int argc, char *argv[]) {
 	
-	char options[] = "ispuU:cC:dv";	
+	char options[] = "ispuU:cC:dvV:";	
 	int c;
-	char *U_ptr, *C_ptr;
+	char *U_ptr, *C_ptr, *V_ptr, *env_name, *env_val;
 	char cwd[PATH_MAX_SIZE];
 	struct rlimit rlp;
 	
@@ -63,6 +64,13 @@ int main(int argc, char *argv[]) {
 			for (char **env_var = environ; *env_var != NULL; env_var++) {
         		printf("%s\n", *env_var);
     		}
+		case 'V':
+			V_ptr = optarg;
+			env_name = strtok(V_ptr, '=');
+			env_val = strtok(V_ptr, '=');
+			if (setenv(env_name, env_val, 1) == 0) {
+				printf("variable %s is set to $s", env_name, env_val);
+			}
 		default:
 			break;
 		}
