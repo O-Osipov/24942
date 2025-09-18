@@ -32,12 +32,13 @@ int main(int argc, char *argv[]) {
 			break;
 		case 'u':
 			getrlimit(RLIMIT_FSIZE, &rlp);
-			printf("ulimit is %lu\n", rlp.rlim_max);
-			printf("(%ld)", ulimit(UL_GETFSIZE));
+			printf("ulimit is %lu\n(%lu)\n\n", rlp.rlim_max, rlp.rlim_cur);
+			printf("(%ld)\n", ulimit(UL_GETFSIZE));
 			break;
 		case 'U':
 			U_ptr = optarg;
-			rlp.rlim_max = atol(U_ptr);
+			rlp.rlim_cur = atol(U_ptr);
+			rlp.rlim_max = rlp.rlim_cur;
 			if (setrlimit(RLIMIT_FSIZE, &rlp) == 0)
 				printf("ulimit value has changed.\n");
 			break;
