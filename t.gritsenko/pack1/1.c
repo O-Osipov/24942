@@ -35,8 +35,8 @@ int main(int argc, char *argv[]) {
 			break;
 		case 'U':
 			U_ptr = optarg;
-			//rlp.rlim_cur = atol(U_ptr);
-			rlp.rlim_max = atol(U_ptr);
+			rlp.rlim_cur = atol(U_ptr);
+			//rlp.rlim_max = atol(U_ptr);
 			if (setrlimit(RLIMIT_FSIZE, &rlp) == 0)
 				printf("ulimit value has changed.\n");
 			break;
@@ -45,7 +45,7 @@ int main(int argc, char *argv[]) {
 			printf("max core-file size is %lu or %lu", rlp.rlim_max, rlp.rlim_cur);
 		case 'C':
 			C_ptr = optarg;
-			rlp.rlim_max = atol(C_ptr);
+			rlp.rlim_cur = atol(C_ptr);
 			if (setrlimit(RLIMIT_CORE, &rlp) == 0)
 				printf("max core-file size has changed.\n");
 		default:
