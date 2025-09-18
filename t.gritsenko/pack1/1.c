@@ -28,7 +28,7 @@ int main(int argc, char *argv[]) {
 			pid_t pid = getpid();
 			pid_t ppid = getppid();
 			pid_t pgrp = getpgrp();
-			printf("pid: %d\nppid: %d\npgrp: %d", 
+			printf("pid: %d\nppid: %d\npgrp: %d\n", 
 				pid, ppid, pgrp);
 		default:
 			break;
