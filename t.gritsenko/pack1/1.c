@@ -54,7 +54,7 @@ int main(int argc, char *argv[]) {
 			if (setrlimit(RLIMIT_CORE, &rlp) == 0) 
 				printf("max core-file size has changed.\n");
 		case 'd':
-			if (getcwd(cwd, sizoef(cwd))) {
+			if (getcwd(cwd, sizeof(cwd))) {
 				printf("%s", cwd);
 			}
 		default:
