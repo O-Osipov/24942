@@ -14,10 +14,10 @@ int main(int argc, char *argv[]) {
 
 		switch (c) {
 		case 'i':
-			uid_t uid = getuid();
-			uid_t euid = geteuid();
-			gid_t gid = getgid();
-			gid_t egid = getegid();
+			unsigned int uid = getuid();
+			unsigned int euid = geteuid();
+			unsigned int gid = getgid();
+			unsigned int egid = getegid();
 			printf("uid: %u\neuid: %u\ngid: %u\negid: %u\n", 
 				uid, euid, gid, egid);
 			break;
@@ -25,9 +25,9 @@ int main(int argc, char *argv[]) {
 			if (setpgid(0, 0) == 0)
 				printf("Current process is set as a group leader.\n");
 		case 'p':
-			pid_t pid = getpid();
-			pid_t ppid = getppid();
-			pid_t pgrp = getpgrp();
+			int pid = getpid();
+			int ppid = getppid();
+			int pgrp = getpgrp();
 			printf("pid: %d\nppid: %d\npgrp: %d\n", 
 				pid, ppid, pgrp);
 		default:
