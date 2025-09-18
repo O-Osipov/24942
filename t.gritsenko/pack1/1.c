@@ -14,8 +14,9 @@ int main(int argc, char *argv[]) {
 
 		switch (c) {
 		case 'i':
+			uid_t id = getuid();
 			printf("uid: %u\neuid: %u\ngid: %u\negid: %u\n", 
-				getuid(), geteuid(), getgid(), getegid());
+				id, geteuid(), getgid(), getegid());
 			break;
 		case 's':
 			if (setpgid(0, 0) == 0)
