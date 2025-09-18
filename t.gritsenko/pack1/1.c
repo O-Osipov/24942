@@ -6,11 +6,14 @@
 #include <sys/resource.h>
 #include <ulimit.h>
 
+#define PATH_MAX_SIZE 1024
+
 int main(int argc, char *argv[]) {
 	
-	char options[] = "ispuU:cC:";	
+	char options[] = "ispuU:cC:d";	
 	int c;
 	char *U_ptr, *C_ptr;
+	char cwd[PATH_MAX_SIZE];
 	struct rlimit rlp;
 	
 
@@ -43,12 +46,17 @@ int main(int argc, char *argv[]) {
 		case 'c':
 			getrlimit(RLIMIT_CORE, &rlp);
 			printf("max core-file size is %lu\n", rlp.rlim_max);
-		case 'C':
+		case 'C': // not working idk
 			C_ptr = optarg;
 			getrlimit(RLIMIT_CORE, &rlp);
 			rlp.rlim_cur = atol(C_ptr);
-			if (setrlimit(RLIMIT_CORE, &rlp) == 0)
+			rlp.rlim_max = rlp.rlim_cur;
+			if (setrlimit(RLIMIT_CORE, &rlp) == 0) 
 				printf("max core-file size has changed.\n");
+		case 'd':
+			if (getcwd(cwd, sizoef(cwd))) {
+				printf("%s", cwd);
+			}
 		default:
 			break;
 		}
