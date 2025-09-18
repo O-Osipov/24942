@@ -8,6 +8,8 @@
 
 #define PATH_MAX_SIZE 1024
 
+extern char **environ;
+
 int main(int argc, char *argv[]) {
 	
 	char options[] = "ispuU:cC:d";	
@@ -54,9 +56,13 @@ int main(int argc, char *argv[]) {
 			if (setrlimit(RLIMIT_CORE, &rlp) == 0) 
 				printf("max core-file size has changed.\n");
 		case 'd':
-			if (getcwd(cwd, sizeof(cwd))) {
+			if (getcwd(cwd, PATH_MAX_SIZE)) {
 				printf("%s", cwd);
 			}
+		case 'v':
+			for (char **env_var = environ; *env_var != NULL; env_var++) {
+        		printf("%s\n", *env_var);
+    		}
 		default:
 			break;
 		}
