@@ -6,9 +6,10 @@
 
 int main(int argc, char *argv[]) {
 	
-	char options[] = "ispu";	
+	char options[] = "ispuU:";	
 	int c;
-	char *s_ptr;
+	char *U_ptr;
+	long new_fsize;
 
 	while ((c = getopt(argc, argv, options)) != EOF) {
 
@@ -20,11 +21,20 @@ int main(int argc, char *argv[]) {
 		case 's':
 			if (setpgid(0, 0) == 0)
 				printf("Current process is set as a group leader.\n");
+			break;
 		case 'p':
 			printf("pid: %d\nppid: %d\npgrp: %d\n", 
 				getpid(), getppid(), getpgrp());
+			break;
 		case 'u':
-			ulimit(UL_GETFSIZE);
+			printf("ulimit is %ld\n", ulimit(UL_GETFSIZE));
+			break;
+		case 'U':
+			U_ptr = optarg;
+			new_fsize = atol(U_ptr);
+			if (ulimit(UL_SETFSIZE, new_fsize) == new_fsize)
+				printf("ulimit value has changed.\n");
+			break;
 		default:
 			break;
 		}
