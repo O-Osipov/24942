@@ -4,7 +4,7 @@
 #include <sys/types.h>
 #include <sys/time.h>
 #include <sys/resource.h>
-
+#include <ulimit.h>
 
 int main(int argc, char *argv[]) {
 	
@@ -31,12 +31,12 @@ int main(int argc, char *argv[]) {
 			break;
 		case 'u':
 			getrlimit(RLIMIT_FSIZE, &rlp);
-			printf("ulimit is %lu\n", rlp.rlim_max);
+			printf("ulimit is %lu or %ld\n", rlp.rlim_max, ulimit(UL_GETFSIZE));
 			break;
 		case 'U':
 			U_ptr = optarg;
-			rlp.rlim_cur = atol(U_ptr);
-			rlp.rlim_max = rlp.rlim_cur;
+			//rlp.rlim_cur = atol(U_ptr);
+			rlp.rlim_max = atol(U_ptr);
 			if (setrlimit(RLIMIT_FSIZE, &rlp) == 0)
 				printf("ulimit value has changed.\n");
 			break;
@@ -45,8 +45,7 @@ int main(int argc, char *argv[]) {
 			printf("max core-file size is %lu\n", rlp.rlim_max);
 		case 'C':
 			C_ptr = optarg;
-			rlp.rlim_cur = atol(C_ptr);
-			rlp.rlim_max = rlp.rlim_cur;
+			rlp.rlim_max = atol(C_ptr);
 			if (setrlimit(RLIMIT_CORE, &rlp) == 0)
 				printf("max core-file size has changed.\n");
 		default:
