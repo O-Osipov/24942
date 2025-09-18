@@ -12,7 +12,7 @@ extern char **environ;
 
 int main(int argc, char *argv[]) {
 	
-	char options[] = "ispuU:cC:d";	
+	char options[] = "ispuU:cC:dv";	
 	int c;
 	char *U_ptr, *C_ptr;
 	char cwd[PATH_MAX_SIZE];
