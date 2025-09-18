@@ -53,9 +53,13 @@ int main(int argc, char *argv[]) {
 			C_ptr = optarg;
 			getrlimit(RLIMIT_CORE, &rlp);
 			rlp.rlim_cur = atol(C_ptr);
-			rlp.rlim_max = rlp.rlim_cur;
-			if (setrlimit(RLIMIT_CORE, &rlp) == 0) 
-				printf("max core-file size has changed.\n");
+			if (setrlimit(RLIMIT_CORE, &rlp) == -1) {
+				perror("setrlimit failed");
+				return 1;
+			}
+			getrlimit(RLIMIT_CORE, &rlp);
+			printf("New soft core file limit: %lu\n", rlp.rlim_cur);
+			printf("New hard core file limit: %lu\n", rlp.rlim_max);
 		case 'd':
 			if (getcwd(cwd, PATH_MAX_SIZE)) {
 				printf("%s", cwd);
