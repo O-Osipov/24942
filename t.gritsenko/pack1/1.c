@@ -114,7 +114,7 @@ int main(int argc, char *argv[]) {
 		case 'C': {
 			C_ptr = optarg;
 			char *endptr;
-			long val = strtol(U_ptr, &endptr, 10);
+			long val = strtol(C_ptr, &endptr, 10);
 			if (*endptr != '\0' || val < 0) {
 				printf("Invalid value for -C: %s\n", U_ptr);
 				break;
