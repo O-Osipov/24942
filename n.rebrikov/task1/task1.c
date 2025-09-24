@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <unistd.h>
 #include <sys/types.h>
+#include <sys/resource.h>
 #include <sys/stat.h>
 #include <pwd.h>
 #include <grp.h>
@@ -21,7 +22,7 @@ void print_env(char *envp[]); // Распечатывает переменные
 void set_env_var(const char*); // Вносит новую переменную в среду или изменяет значение существующей переменной
 
 
-int main(int argc, char argv*[], char *envp[])
+int main(int argc, char* argv[], char *envp[])
 {
     int opt;
     while( (opt = getopt(argc,argv, "ispuU:cC:dvV:")) != -1)
@@ -38,7 +39,9 @@ int main(int argc, char argv*[], char *envp[])
             case 'd': print_cwd(); break;
             case 'v': print_env(envp); break;
             case 'V': set_env_var(optarg); break;
-            default: usage(); exit(EXIT_FAILURE);
+            default: fprintf(stderr, "Unknown option: -%c\n", optopt);
+		fprintf(stderr, "Usage: task1 [-ispuU:cC:dvV:]\n");
+		exit(EXIT_FAILURE);
         }
     }
     return 0;
@@ -144,7 +147,7 @@ void print_env(char *envp[])
 
 void set_env_var(const char* assignment)
 {
-    char* equals = strchr(assignment, '=') // возвращает указатель на первое вхождение '='
+    char* equals = strchr(assignment, '='); // возвращает указатель на первое вхождение '='
     if(!equals)
     {
         fprintf(stderr, "Invalid environment assignment: %s\n", assignment);
