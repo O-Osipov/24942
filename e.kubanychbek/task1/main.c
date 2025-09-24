@@ -7,7 +7,7 @@
 #include <pwd.h>        // Работа с паролями пользователей
 #include <grp.h>        // Работа с группами
 #include <string.h>     // Работа со строками (strdup)
-#include <linux/limits.h> // Максимальные значения (PATH_MAX)
+
 
 extern char *optarg;
 extern int optopt;
