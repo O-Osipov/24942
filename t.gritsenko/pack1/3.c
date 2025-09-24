@@ -19,7 +19,7 @@ int main(int argc, char* argv[]) {
         perror("Couldn't open file");
     }
 
-    setuid(euid);
+    setuid(uid);
 
     uid = getuid();
     euid = geteuid();
