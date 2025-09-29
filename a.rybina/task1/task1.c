@@ -6,6 +6,7 @@
 #include <limits.h>
 #include <string.h>
 #include <errno.h>
+#include <ulimit.h>
 
 //-i  Печатает реальные и эффективные идентификаторы пользователя и группы.
 //-s  Процесс становится лидером группы. Подсказка: смотри setpgid(2).
@@ -178,7 +179,7 @@ int main(int argc, char *argv[]) {
             case 'v':
                 print_environment();
                 break;
-            case 'V':
+            case 'V': {
                 char *name, *value;
                 if (parse_env_name(optarg, &name, &value) == 0) {
                     set_environment_variable(name, value);
@@ -186,6 +187,7 @@ int main(int argc, char *argv[]) {
                     free(value);
                 }
                 break;
+            }
             default:
                 exit(EXIT_FAILURE);
         }
