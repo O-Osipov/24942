@@ -8,84 +8,82 @@
 
 int main(){
     int fd;
-    char *filename = "file.txt";
-    char *buffer = NULL;
-    char **lines = NULL;
-    int line_count = 0;
-    int line_number = 0;
-    int bytes_read;
-    int total_size = 0;
-    int current_size = 1024;
-    
-    // Allocate initial buffer
-    buffer = malloc(current_size);
-    if (buffer == NULL) {
-        perror("malloc");
-        return 1;
-    }
 
+    char *filename = "file.txt";
+    char buffer[1024];
+    
+    int *line_offsets = NULL;
+    int *line_lengths = NULL;
+    int line_count = 0, line_number = 0, line_idx = 0;
+    int line_start_pos = 0, line_length = 0;
+    int bytes_read;
+    int current_pos = 0;
+    
+    
     fd = open(filename, O_RDONLY);
     if (fd == -1){
         perror("open");
-        free(buffer);
         return 1;
     }
-
-    // Read entire file into buffer
-    while ((bytes_read = read(fd, buffer + total_size, current_size - total_size)) > 0) {
-        total_size += bytes_read;
-        if (total_size >= current_size) {
-            current_size *= 2;
-            buffer = realloc(buffer, current_size);
-            if (buffer == NULL) {
-                perror("realloc");
-                close(fd);
-                return 1;
+    
+    // Count lines
+    while ((bytes_read = read(fd, buffer, sizeof(buffer))) > 0) {
+        for (int i = 0; i < bytes_read; i++) {
+            if (buffer[i] == '\n') {
+                line_count++;
             }
         }
     }
     
-    if (bytes_read == -1) {
-        perror("read");
-        close(fd);
-        free(buffer);
-        return 1;
+    // Check if last line doesn't end with newline
+    lseek(fd, -1, SEEK_END);
+    read(fd, buffer, 1);
+    if (buffer[0] != '\n') {
+        line_count++;
     }
     
-    buffer[total_size] = '\0';  // Null terminate the string
+    line_offsets = malloc(line_count * sizeof(int));
+    line_lengths = malloc(line_count * sizeof(int));
     
-    // Count lines
-    for (int i = 0; i < total_size; i++) {
-        if (buffer[i] == '\n') {
-            line_count++;
-        }
-    }
-    if (total_size > 0 && buffer[total_size-1] != '\n') {
-        line_count++;  // Last line doesn't end with newline
-    }
-    
-    // Allocate array for line pointers
-    lines = malloc(line_count * sizeof(char*));
-    if (lines == NULL) {
+    if (line_offsets == NULL || line_lengths == NULL) {
         perror("malloc");
         close(fd);
-        free(buffer);
         return 1;
     }
     
-    // Parse lines
-    int line_idx = 0;
-    char *line_start = buffer;
-    for (int i = 0; i <= total_size; i++) {
-        if (buffer[i] == '\n' || buffer[i] == '\0') {
-            buffer[i] = '\0';  // Replace newline with null terminator
-            lines[line_idx] = line_start;
-            line_idx++;
-            line_start = &buffer[i + 1];
+    // Reset to beginning and build offset table
+    lseek(fd, 0, SEEK_SET);
+    current_pos = 0;
+    line_start_pos = 0;
+    line_length = 0;
+    
+    while ((bytes_read = read(fd, buffer, sizeof(buffer))) > 0) {
+        for (int i = 0; i < bytes_read; i++) {
+            if (buffer[i] == '\n') {
+                line_offsets[line_idx] = line_start_pos;
+                line_lengths[line_idx] = line_length;
+                
+                printf("Line %d: offset=%d, length=%d\n", 
+                       line_idx + 1, line_start_pos, line_length);
+                
+                line_idx++;
+                line_start_pos = current_pos + i + 1;
+                line_length = 0;
+            } else {
+                line_length++;
+            }
+            current_pos++;
         }
     }
+
+    if (line_idx < line_count) {
+        line_offsets[line_idx] = line_start_pos;
+        line_lengths[line_idx] = line_length;
+        printf("Line %d: offset=%d, length=%d\n", 
+               line_idx + 1, line_start_pos, line_length);
+    }
     
-    printf("File has %d lines\n", line_count);
+    printf("\nFile has %d lines\n", line_count);
     
     // Main loop for line number input
     while (1){
@@ -101,11 +99,33 @@ int main(){
             continue;
         }
         
-        printf("Line %d: %s\n", line_number, lines[line_number - 1]);
+        // Position at the start of the requested line
+        int target_line = line_number - 1;
+        int offset = line_offsets[target_line];
+        int length = line_lengths[target_line];
+        
+        printf("Positioning at offset %d, reading %d bytes\n", offset, length);
+        
+        // Use lseek to position at the line start
+        if (lseek(fd, offset, SEEK_SET) == -1) {
+            perror("lseek");
+            continue;
+        }
+        
+        // Read exactly the line length
+        bytes_read = read(fd, buffer, length);
+        if (bytes_read == -1) {
+            perror("read");
+            continue;
+        }
+        
+        // Null terminate and print
+        buffer[bytes_read] = '\0';
+        printf("Line %d: %s\n", line_number, buffer);
     }
 
     close(fd);
-    free(buffer);
-    free(lines);
+    free(line_offsets);
+    free(line_lengths);
     return 0;
 }
