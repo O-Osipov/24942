@@ -51,3 +51,8 @@ int main() {
     
     return 0;
 }
+
+/*
+ gcc -o 1 1.c
+./1
+*/

@@ -85,5 +85,8 @@ int main() {
     return 0;
 }
 
-// g++ -o string_list string_list.cpp
-// ./string_list
+/*
+g++ -o string_list string_list.cpp
+chmod +x quick_test.sh
+./quick_test.sh
+*/  

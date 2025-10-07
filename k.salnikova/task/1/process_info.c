@@ -331,7 +331,8 @@ int main(int argc, char *argv[]) {
 }
 
 
-/*
+/* 
+gcc -o process_info process_info.c
 chmod +x test_process_info.sh
 ./test_process_info.sh 
 */
