@@ -8,7 +8,6 @@
 #include <errno.h>
 #include <limits.h>
 #include <getopt.h>
-#include <linux/limits.h>
 
 /*
  * Функция для печати идентификаторов пользователя и группы
