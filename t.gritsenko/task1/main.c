@@ -89,7 +89,7 @@ int main(int argc, char *argv[]) {
 			break;
 
 		case 'u':
-        	printf("Max child processes per user: %ld\n", sysconf(_SC_CHILD_MAX););
+        	printf("Max child processes per user: %ld\n", sysconf(_SC_CHILD_MAX));
 			break;
 
 		case 'U': {
