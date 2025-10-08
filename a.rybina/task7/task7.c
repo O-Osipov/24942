@@ -175,8 +175,9 @@ int main(int argc, char* argv[]) {
         Line line = table.array[num - 1]; //Line
         
         // Use memory mapping to access the line directly
-        if (line.offset + line.length > file_size) {
-            printf("Error: Line extends beyond file size\n");
+        if (line.offset < 0 || line.length < 0 || 
+            (size_t)(line.offset + line.length) > file_size) {
+            printf("Error: Line extends beyond file size or has invalid offset/length\n");
             // Reset alarm for next input
             alarm(5);
             continue;
