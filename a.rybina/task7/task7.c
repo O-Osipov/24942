@@ -147,6 +147,7 @@ int main(int argc, char* argv[]) {
     
     while (1) {
         int num;
+        char input[100];
         printf("Enter the line number: ");
         fflush(stdout);
         
@@ -155,11 +156,35 @@ int main(int argc, char* argv[]) {
             break;
         }
         
-        if (scanf("%d", &num) != 1) {
-            // Clear input buffer on error
-            while (getchar() != '\n');
+        // Read input as string to validate
+        if (fgets(input, sizeof(input), stdin) == NULL) {
+            printf("Input error. Please try again.\n");
+            // Reset alarm for next input
+            alarm(5);
             continue;
         }
+        
+        // Remove newline character
+        input[strcspn(input, "\n")] = '\0';
+        
+        // Validate input - only accept numbers
+        int valid = 1;
+        for (int i = 0; input[i] != '\0'; i++) {
+            if (input[i] < '0' || input[i] > '9') {
+                valid = 0;
+                break;
+            }
+        }
+        
+        if (!valid) {
+            printf("Invalid input. Please enter only numbers (0-9).\n");
+            // Reset alarm for next input
+            alarm(5);
+            continue;
+        }
+        
+        // Convert string to number
+        num = atoi(input);
         
         // Cancel alarm since user provided input
         alarm(0);

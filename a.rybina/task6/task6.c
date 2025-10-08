@@ -1,5 +1,7 @@
 // Измените программу так, чтобы пользователю отводилось 5 секунд на ввод номера строки. Если пользователь не успевает, программа должна распечатать все содержимое файла и завершиться. Если же пользователь успел в течение пяти секунд ввести номер строки, то программа должна работать как в предыдущей задаче.
 
+// BPVTYBNM ALARM
+
 #include <stdlib.h>
 #include <fcntl.h>
 #include <unistd.h>
@@ -124,34 +126,62 @@ int main(int argc, char* argv[]) {
     }
     printf("\nTotal lines: %d\n\n", table.cnt);
 
-    // Set alarm for 5 seconds
+    // Set alarm for 5 seconds (only for the first prompt)
     printf("You have 5 seconds to enter a line number. If no input, entire file will be printed.\n");
     alarm(5);
+    int first_prompt = 1;
     
     while (1) {
         int num;
+        char input[100];
         printf("Enter the line number: ");
         fflush(stdout);
         
-        // Check if timeout occurred
-        if (timeout_occurred) {
+        // Check if timeout occurred (only for the first prompt)
+        if (first_prompt && timeout_occurred) {
             break;
         }
         
-        if (scanf("%d", &num) != 1) {
-            // Clear input buffer on error
-            while (getchar() != '\n');
+        // Read input as string to validate
+        if (fgets(input, sizeof(input), stdin) == NULL) {
+            printf("Input error. Please try again.\n");
+            // Reset alarm only while first prompt is active
+            if (first_prompt) alarm(5);
             continue;
         }
         
-        // Cancel alarm since user provided input
-        alarm(0);
+        // Remove newline character
+        input[strcspn(input, "\n")] = '\0';
+        
+        // Validate input - only accept numbers
+        int valid = 1;
+        for (int i = 0; input[i] != '\0'; i++) {
+            if (input[i] < '0' || input[i] > '9') {
+                valid = 0;
+                break;
+            }
+        }
+        
+        if (!valid) {
+            printf("Invalid input. Please enter only numbers (0-9).\n");
+            // Reset alarm only while first prompt is active
+            if (first_prompt) alarm(5);
+            continue;
+        }
+        
+        // Convert string to number
+        num = atoi(input);
+        
+        // Cancel alarm since user provided first valid input
+        if (first_prompt) {
+            alarm(0);
+            first_prompt = 0;
+        }
 
         if (num == 0) { break; }
         if (table.cnt < num) {
             printf("The file contains only %d line(s).\n", table.cnt);
-            // Reset alarm for next input
-            alarm(5);
+            // No more alarm after the first valid input
             continue;
         }
 
@@ -161,24 +191,21 @@ int main(int argc, char* argv[]) {
         if (lseek(fd, line.offset, SEEK_SET) == -1) {
             perror("Error seeking in file");
             free(buf);
-            // Reset alarm for next input
-            alarm(5);
+            // No more alarm after the first valid input
             continue;
         }
         
         if (read(fd, buf, line.length) == -1) {
             perror("Error reading line");
             free(buf);
-            // Reset alarm for next input
-            alarm(5);
+            // No more alarm after the first valid input
             continue;
         }
 
         printf("Line %d: %s\n", num, buf);
         free(buf);
         
-        // Reset alarm for next input
-        alarm(5);
+        // No more alarm after the first valid input
     }
 
     close(fd);

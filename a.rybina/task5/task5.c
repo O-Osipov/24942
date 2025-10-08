@@ -88,8 +88,34 @@ int main(int argc, char* argv[]) {
 
     while (1) {
         int num;
+        char input[100];
         printf("Enter the line number: ");
-        scanf("%d", &num);
+        
+        // Read input as string to validate
+        if (fgets(input, sizeof(input), stdin) == NULL) {
+            printf("Input error. Please try again.\n");
+            continue;
+        }
+        
+        // Remove newline character
+        input[strcspn(input, "\n")] = '\0';
+        
+        // Validate input - only accept numbers
+        int valid = 1;
+        for (int i = 0; input[i] != '\0'; i++) {
+            if (input[i] < '0' || input[i] > '9') {
+                valid = 0;
+                break;
+            }
+        }
+        
+        if (!valid) {
+            printf("Invalid input. Please enter only numbers (0-9).\n");
+            continue;
+        }
+        
+        // Convert string to number
+        num = atoi(input);
 
         if (num == 0) { break; }
         if (table.cnt < num) {
