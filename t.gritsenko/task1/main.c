@@ -5,7 +5,6 @@
 #include <sys/time.h>
 #include <sys/resource.h>
 #include <string.h>
-#include <ulimit.h>
 
 #define PATH_MAX_SIZE 1024
 
@@ -90,8 +89,8 @@ int main(int argc, char *argv[]) {
 			break;
 
 		case 'u':
-			getrlimit(RLIMIT_NPROC, &rlp);
-			printf("Ulimit is %llu bytes\n", (unsigned long long)rlp.rlim_cur);
+			long max_processes = sysconf(_SC_CHILD_MAX);
+        	printf("Max child processes per user: %ld\n", max_processes);
 			break;
 
 		case 'U': {
