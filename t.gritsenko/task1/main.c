@@ -5,10 +5,13 @@
 #include <sys/time.h>
 #include <sys/resource.h>
 #include <string.h>
+#include <ulimit.h>
 
 #define PATH_MAX_SIZE 1024
 
 extern char **environ;
+
+//change ulimit
 
 void print_help(const char *progname) {
     printf("Usage: %s [options]\n", progname);
@@ -87,7 +90,7 @@ int main(int argc, char *argv[]) {
 			break;
 
 		case 'u':
-			getrlimit(RLIMIT_FSIZE, &rlp);
+			getrlimit(RLIMIT_NPROC, &rlp);
 			printf("Ulimit is %llu bytes\n", (unsigned long long)rlp.rlim_cur);
 			break;
 
