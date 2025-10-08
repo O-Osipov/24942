@@ -72,10 +72,11 @@ void print_procces_id()
 
 void print_ulimit()
 {
-    struct rlimit rl;
-    if(getrlimit(RLIMIT_FSIZE, &rl) == 0)
-    {
-        printf("Ulimit (file size): %ld\n", (long)rl.rlim_cur);
+    long max_processes = sysconf(_SC_CHILD_MAX);
+    if (max_processes != -1) {
+        printf("Max child processes per user: %ld\n", max_processes);
+    } else {
+        perror("sysconf failed");
     }
 }
 
