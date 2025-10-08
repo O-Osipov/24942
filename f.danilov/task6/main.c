@@ -102,11 +102,12 @@ int main(int argc, char *argv[]) {
 
 
     signal(SIGALRM, alarmHandler); // устанавливаем обработчик сигнала
+    alarm(5);
     // Основной цикл запросов
     while (1) {
         int line_num;
         printf("\nВведите номер строки (0 для выхода). У вас есть 5 секунд чтобы ввести данные:");
-        alarm(5);
+        
 
         if (scanf("%d", &line_num) != 1) {
             printf("Ошибка ввода\n");
