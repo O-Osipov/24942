@@ -141,9 +141,10 @@ int main(int argc, char* argv[]) {
     }
     printf("\nTotal lines: %d\n\n", table.cnt);
 
-    // Set alarm for 5 seconds
+    // Set alarm for 5 seconds (only for the first prompt)
     printf("You have 5 seconds to enter a line number. If no input, entire file will be printed.\n");
     alarm(5);
+    int first_prompt = 1;
     
     while (1) {
         int num;
@@ -151,16 +152,16 @@ int main(int argc, char* argv[]) {
         printf("Enter the line number: ");
         fflush(stdout);
         
-        // Check if timeout occurred
-        if (timeout_occurred) {
+        // Check if timeout occurred (only for the first prompt)
+        if (first_prompt && timeout_occurred) {
             break;
         }
         
         // Read input as string to validate
         if (fgets(input, sizeof(input), stdin) == NULL) {
             printf("Input error. Please try again.\n");
-            // Reset alarm for next input
-            alarm(5);
+            // Reset alarm only while first prompt is active
+            if (first_prompt) alarm(5);
             continue;
         }
         
@@ -178,22 +179,24 @@ int main(int argc, char* argv[]) {
         
         if (!valid) {
             printf("Invalid input. Please enter only numbers (0-9).\n");
-            // Reset alarm for next input
-            alarm(5);
+            // Reset alarm only while first prompt is active
+            if (first_prompt) alarm(5);
             continue;
         }
         
         // Convert string to number
         num = atoi(input);
         
-        // Cancel alarm since user provided input
-        alarm(0);
+        // Cancel alarm since user provided first valid input
+        if (first_prompt) {
+            alarm(0);
+            first_prompt = 0;
+        }
 
         if (num == 0) { break; }
         if (table.cnt < num) {
             printf("The file contains only %d line(s).\n", table.cnt);
-            // Reset alarm for next input
-            alarm(5);
+            // No more alarm after the first valid input
             continue;
         }
 
@@ -203,8 +206,7 @@ int main(int argc, char* argv[]) {
         if (line.offset < 0 || line.length < 0 || 
             (size_t)(line.offset + line.length) > file_size) {
             printf("Error: Line extends beyond file size or has invalid offset/length\n");
-            // Reset alarm for next input
-            alarm(5);
+            // No more alarm after the first valid input
             continue;
         }
         
@@ -213,8 +215,7 @@ int main(int argc, char* argv[]) {
         fwrite(mapped_file + line.offset, 1, line.length, stdout);
         printf("\n");
         
-        // Reset alarm for next input
-        alarm(5);
+        // No more alarm after the first valid input
     }
 
     // Clean up memory mapping
