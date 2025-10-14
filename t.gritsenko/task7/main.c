@@ -77,11 +77,11 @@ int main(int argc, char *argv[]) {
             continue;
         }
 
-        Row row = table.table[num - 1];
-        char *buf = calloc(row.length + 1, sizeof(char));
+        Row line = table.table[num - 1];
+        char *buf = calloc(line.length + 1, sizeof(char));
 
-        lseek(fd, row.offset, SEEK_SET);
-        read(fd, buf, row.length * sizeof(char));
+        lseek(fd, line.offset, SEEK_SET);
+        read(fd, buf, line.length * sizeof(char));
 
         printf("%s\n", buf);
         free(buf);

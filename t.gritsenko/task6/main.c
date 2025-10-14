@@ -2,6 +2,7 @@
 #include <fcntl.h>
 #include <unistd.h>
 #include <stdio.h>
+#include <sys/select.h>
 
 typedef struct {
     off_t offset;
@@ -35,6 +36,16 @@ void free_table(Table *a) {
     a->cnt = a->cap = 0;
 }
 
+void print_row(Row row, int fd) {
+    char *buf = calloc(row.length + 1, sizeof(char));
+
+    lseek(fd, row.offset, SEEK_SET);
+    read(fd, buf, row.length * sizeof(char));
+
+    printf("%s\n", buf);
+    free(buf);
+}
+
 int main(int argc, char *argv[]) {
     if (argc != 2) { return 1; }
     char *path = argv[1];
@@ -66,9 +77,27 @@ int main(int argc, char *argv[]) {
         insert_table(&table, current);
     }
 
+    fd_set fdset;
+    struct timeval timeout;
+
     while (1) {
-        int num;
         printf("Enter the line number: ");
+
+        fflush(stdout);
+
+        FD_ZERO(&fdset);
+        FD_SET(STDIN_FILENO, &fdset);
+        timeout.tv_sec = 5;
+        timeout.tv_usec = 0;
+
+        if (!select(1, &fdset, NULL, NULL, &timeout)) {
+            printf("\n\n");
+            for(int i = 0; i < table.cnt; i++)
+                print_row(table.table[i], fd);
+            return 0;
+        }
+
+        int num;
         scanf("%d", &num);
 
         if (num == 0) { break; }

@@ -1,0 +1,6 @@
+{
+    "files.associations": {
+        "bitset": "c",
+        "string_view": "c"
+    }
+}
