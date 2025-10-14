@@ -1,4 +1,4 @@
-#include <stdio.h>
+#include <stdio.h> //НЕ СДАЛ (исправил)
 #include <stdlib.h>
 #include <string.h>
 #define MAX_LEN 1024 // максимальная длина строки
@@ -31,6 +31,28 @@ void add_node(ListNode ** list, char * new_str){
     }
 }
 
+char * read_line(){
+    static char buffer[MAX_LEN];
+    int pos = 0;
+    int ch;
+
+    while (1) {
+        ch = getchar();
+
+        // Обработка Enter
+        if (ch == '\n' || ch == '\r') {
+            buffer[pos] = '\0';
+            return buffer;
+        }
+
+        if (ch >= 32 && ch <= 126) {
+            if (pos < MAX_LEN - 1) {
+                buffer[pos++] = (char)ch;
+            }
+        }
+    }
+}
+
 // Функция для вывода всех строк из списка
 void print_list(ListNode* list) {
     ListNode* current = list;
@@ -56,11 +78,11 @@ int free_memory(ListNode* list){
 
 int main(void){
     ListNode* list = NULL;
-    char line[MAX_LEN];
+    char * line;
     printf("Вводите строки (для завершения введите '.' в начале строки):\n");
 
     while (1){
-        fgets(line, MAX_LEN, stdin);
+        line = read_line();
 
         // проверяем условие завершения (точка в начале строки)
         if (line[0] == '.') {
