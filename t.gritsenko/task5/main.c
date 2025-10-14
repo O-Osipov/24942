@@ -20,13 +20,13 @@ void init_table(Table *a) {
     a->cap = 1;
 }
 
-void insert_table(Table *a, Row element) {
+void insert_row(Table *a, Row row) {
     if (a->cnt == a->cap) {
         a->cap *= 2;
         a->table = realloc(a->table, a->cap * sizeof(Row));
     }
 
-    a->table[a->cnt++] = element;
+    a->table[a->cnt++] = row;
 }
 
 void free_table(Table *a) {
@@ -52,7 +52,7 @@ int main(int argc, char *argv[]) {
     while (read(fd, &c, 1) == 1) {
         if (c == '\n') {
             Row current = {line_offset, line_length};
-            insert_table(&table, current);
+            insert_row(&table, current);
 
             line_offset += line_length + 1;
             line_length = 0;
@@ -63,7 +63,7 @@ int main(int argc, char *argv[]) {
 
     if (line_length > 0) {
         Row current = {line_offset, line_length};
-        insert_table(&table, current);
+        insert_row(&table, current);
     }
 
     while (1) {
