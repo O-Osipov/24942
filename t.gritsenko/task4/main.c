@@ -21,6 +21,20 @@ void init_list() {
     tail = head;
 }
 
+void free_list() {
+    Node* ptr = head;
+    while (ptr != NULL) {
+        Node* tmp = ptr;
+        ptr = ptr->next;
+        if (tmp->string != NULL) {
+            free(tmp->string);
+        }
+        free(tmp);
+    }
+    head = NULL;
+    tail = NULL;
+}
+
 void push(char *string) {
     unsigned long len = strlen(string) + 1;
     char *copy_ptr = calloc(len, sizeof(char));
@@ -73,6 +87,7 @@ int main() {
     while (fgets(input_buffer, BUFFER_SIZE, stdin) != NULL) {
         if (input_buffer[0] == '.') {
             print_list();
+            free_list();
             return 0;
         }
 
