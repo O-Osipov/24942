@@ -1,5 +1,7 @@
 *
+.vscode
 !*/
 !*c
 !.gitignore
 !Makefile
+!test.txt
