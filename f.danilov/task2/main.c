@@ -1,4 +1,4 @@
-#include <sys/types.h>
+#include <sys/types.h> // СДАЛ
 #include <stdio.h>
 #include <time.h>
 #include <stdlib.h>

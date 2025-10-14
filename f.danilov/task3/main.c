@@ -1,4 +1,4 @@
-#include <stdio.h>
+#include <stdio.h> //НЕ СДАЛ
 #include <stdlib.h>
 #include <unistd.h> // getuid, setuid и тд (системные вызовы)
 #define llu unsigned long long

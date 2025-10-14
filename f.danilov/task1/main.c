@@ -1,8 +1,8 @@
-#include <stdio.h>
+#include <stdio.h> //НЕ СДАЛ(решено правильно)
 #include <stdlib.h>
 #include <unistd.h> // getuid, getgid, setpgid и тд (системные вызовы)
-#include <sys/resource.h>
 #include <string.h>
+#include <sys/resource.h>
 #define PATH_MAX 2048
 #define llu unsigned long long
 
@@ -47,7 +47,7 @@ void process_ids() {
     printf("PGID: %d\n", getpgid(0)); // идентификаторы группы процессов
 }
 
-void ulimit() {
+void ulimit() {    
     struct rlimit rlim;
     
     if (getrlimit(RLIMIT_FSIZE, &rlim) == 0) {
