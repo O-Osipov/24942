@@ -1,28 +1,30 @@
+/*
+    Программма для индексации и произвольного доступа к строкам файла
+*/
 #include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-#include <unistd.h>
-#include <fcntl.h>
-#include <sys/types.h>
+#include <stdlib.h> //для exit
+#include <unistd.h> //read, lseek, close
+#include <fcntl.h>  //open, O_RDONLY
+#include <sys/types.h>  
 #include <sys/stat.h>
 
-#define MAX_LINES 1000 //макс кол-во строк в файле
+#define MAX_LINES 10000 //макс кол-во строк в файле
 #define MAX_LINE_LENGTH 256 //макс длина одной строки
 
 //структура для хранения информации о строках
 typedef struct{
-    long offset; //смещение начала строки в файле
+    long offset; //смещение(в байтах) начала строки в файле до начала новой строки 
     int length;  //длина строки(без символа новой строки)
 } LineInfo;
 
 int main(int argc, char *argv[]){
-    int fd;   //файловый дескриптор 
+    int fd;   //файловый дескриптор (целое число, идентификатор открытого файла)
     char ch;  //для чтения по одному символу
     LineInfo lines[MAX_LINES]; // таблица информации о строках
-    int line_count = 0;        // счетчик строк
-    long current_offset = 0;   // текущая позиция в файле
-    int line_length = 0;       // длина текущей строки 
-    int line_number;           // номер строки для запроса 
+    int line_count = 0;        // счетчик строк, тех которые уже обработаны
+    long current_offset = 0;   // текущая позиция в файле(в байтах)
+    int line_length = 0;       // длина текущей (обрабатываемой)строки 
+    int line_number;           // номер строки для запроса, то есть от пользователя
 
 
     // проверяем аргументы командной строки
@@ -30,7 +32,8 @@ int main(int argc, char *argv[]){
         printf("Использование: %s <filename>\n", argv[0]);
         exit(1);
     }
-    fd = open(argv[1], O_RDONLY);
+    fd = open(argv[1], O_RDONLY);//если успешно открыл, то возвращает неотрицательное число 
+    //O_RDONLY - означает "Открыть только для чтения"
     if (fd == -1){
         perror("Ошибка открытия файла");
         exit(1);
@@ -56,6 +59,8 @@ int main(int argc, char *argv[]){
 
             //получаем текущую позицию для начала следующей строки 
             current_offset = lseek(fd, 0L, SEEK_CUR);
+
+            //защита от переполнения 
             if (line_count < MAX_LINES){
                 lines[line_count].offset = current_offset;
             }
