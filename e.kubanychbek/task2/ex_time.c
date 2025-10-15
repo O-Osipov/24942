@@ -1,5 +1,4 @@
-#define _POSIX_C_SOURCE 199309L //этот макрос необходим для setenv() и tzset()
-
+#define __EXTENSIONS__
 #include <sys/types.h>
 #include <stdio.h>
 #include <time.h> 
