@@ -124,12 +124,12 @@ int main(int argc, char *argv[]){
 
     // Устанавливаем обработчик сигнала ALARM
     signal(SIGALRM, alarm_handler);
-    
+    alarm(TIMEOUT);    
     while(1){
         timeout_occurred = 0;
         
         // Устанавливаем будильник на 5 секунд
-        alarm(TIMEOUT);
+ 
         
         printf("> ");
         fflush(stdout); // важно для вывода промпта
