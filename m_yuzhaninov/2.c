@@ -17,6 +17,7 @@ int main()
 
     struct tm *sp = localtime(&now);
 
+    printf("Часовой пояс: %s\n", tzname[sp->tm_isdst]);
     printf("Текущее время: %s\n", asctime(sp));
 
     return 0;
