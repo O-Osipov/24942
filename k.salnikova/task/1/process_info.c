@@ -8,9 +8,6 @@
 #include <errno.h>
 #include <limits.h>
 
-/* 
- * Функция для печати идентификаторов пользователя и группы
- */
 void print_user_group_ids() {
     printf("=== User and Group IDs ===\n");
     printf("Real User ID (RUID): %d\n", getuid());
@@ -19,9 +16,6 @@ void print_user_group_ids() {
     printf("Effective Group ID (EGID): %d\n", getegid());
 }
 
-/*
- * Функция делает процесс лидером новой группы процессов
- */
 void become_process_group_leader() {
     printf("=== Process Group Leadership ===\n");
     if (setpgid(0, 0) == 0) {
@@ -31,9 +25,6 @@ void become_process_group_leader() {
     }
 }
 
-/*
- * Печатает основные идентификаторы процесса
- */
 void print_process_ids() {
     printf("=== Process Identification ===\n");
     printf("Process ID (PID): %d\n", getpid());
@@ -41,9 +32,6 @@ void print_process_ids() {
     printf("Process Group ID (PGID): %d\n", getpgrp());
 }
 
-/*
- * Получает и печатает текущее значение ulimit для КОЛИЧЕСТВА ПРОЦЕССОВ (как bash ulimit -u)
- */
 void print_process_limit() {
     printf("=== Process Limit (ulimit -u) ===\n");
     struct rlimit rlim;
@@ -60,9 +48,6 @@ void print_process_limit() {
     }
 }
 
-/*
- * Получает и печатает текущее значение ulimit для размера файлов (как bash ulimit -f)
- */
 void print_file_size_limit() {
     printf("=== File Size Limit (ulimit -f) ===\n");
     struct rlimit rlim;
@@ -79,9 +64,6 @@ void print_file_size_limit() {
     }
 }
 
-/*
- * Получает и печатает текущее значение ulimit для размера данных (как bash ulimit -d)
- */
 void print_data_size_limit() {
     printf("=== Data Size Limit (ulimit -d) ===\n");
     struct rlimit rlim;
@@ -98,9 +80,6 @@ void print_data_size_limit() {
     }
 }
 
-/*
- * Получает и печатает текущее значение ulimit для стека (как bash ulimit -s)
- */
 void print_stack_size_limit() {
     printf("=== Stack Size Limit (ulimit -s) ===\n");
     struct rlimit rlim;
@@ -117,9 +96,6 @@ void print_stack_size_limit() {
     }
 }
 
-/*
- * Устанавливает новое значение ulimit для файлов
- */
 int set_file_size_limit(const char *value) {
     printf("=== Setting File Size Limit ===\n");
     struct rlimit rlim;
@@ -156,9 +132,7 @@ int set_file_size_limit(const char *value) {
     return 0;
 }
 
-/*
- * Устанавливает лимит процессов
- */
+
 int set_process_limit(const char *value) {
     printf("=== Setting Process Limit ===\n");
     struct rlimit rlim;
@@ -211,9 +185,6 @@ void print_core_size() {
     }
 }
 
-/*
- * Устанавливает новый размер для core-файлов
- */
 int set_core_size(const char *value) {
     printf("=== Setting Core File Size ===\n");
     struct rlimit rlim;
@@ -282,9 +253,6 @@ void print_environment() {
     }
 }
 
-/*
- * Устанавливает новую переменную окружения или изменяет существующую
- */
 int set_environment_variable(const char *name_value) {
     printf("=== Setting Environment Variable ===\n");
     
@@ -322,13 +290,11 @@ int set_environment_variable(const char *name_value) {
     return 0;
 }
 
-// Структура для хранения опций
 typedef struct {
     char option;
     char *argument;
 } command_option_t;
 
-// Функция для разбора командной строки справа налево
 int parse_options_right_to_left(int argc, char *argv[], command_option_t **options) {
     *options = malloc(argc * sizeof(command_option_t));
     if (*options == NULL) {
@@ -414,34 +380,33 @@ int main(int argc, char *argv[]) {
                 print_process_ids();
                 break;
             case 'u':
-                print_process_limit();  // Соответствует bash: ulimit -u
+                print_process_limit();
                 break;
             case 'f':
-                print_file_size_limit(); // Соответствует bash: ulimit -f
+                print_file_size_limit();
                 break;
             case 'd':
-                print_data_size_limit(); // Соответствует bash: ulimit -d
+                print_data_size_limit(); 
                 break;
             case 'c':
-                print_core_size();      // Соответствует bash: ulimit -c
+                print_core_size();     
                 break;
             case 'U':
                 if (options[i].argument != NULL) {
-                    set_process_limit(options[i].argument); // Установка лимита процессов
+                    set_process_limit(options[i].argument);
                 } else {
                     fprintf(stderr, "Ошибка: опция -U требует значение\n");
                 }
                 break;
             case 'F':
                 if (options[i].argument != NULL) {
-                    set_file_size_limit(options[i].argument); // Установка лимита файлов
+                    set_file_size_limit(options[i].argument);
                 } else {
                     fprintf(stderr, "Ошибка: опция -F требует значение\n");
                 }
                 break;
             case 'D':
                 if (options[i].argument != NULL) {
-                    // Функция для установки лимита данных может быть добавлена
                     printf("Установка лимита данных: %s\n", options[i].argument);
                 } else {
                     fprintf(stderr, "Ошибка: опция -D требует значение\n");
