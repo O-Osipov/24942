@@ -42,6 +42,7 @@ int main(int argc, char* argv[])
     char **env = NULL;
     FILE *fp = NULL;
     char cmd[256];
+    char buf[256];
 
     struct option long_options[] = 
     {
