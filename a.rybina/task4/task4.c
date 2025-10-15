@@ -24,7 +24,6 @@ int main() {
     while (1) {
         printf("> ");
         
-        // Read line dynamically with getline
         bytes_read = getline(&input, &input_size, stdin);
         
         if (bytes_read == -1) {
@@ -36,7 +35,6 @@ int main() {
             break;
         }
 
-        // Remove newline character if present
         if (bytes_read > 0 && input[bytes_read-1] == '\n') {
             input[bytes_read-1] = '\0';
             bytes_read--;
