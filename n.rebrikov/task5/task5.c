@@ -123,7 +123,7 @@ int main(int argc, char *argv[])
     printf("Loaded %d lines from file.\n", table.cnt);
     
     // Основной цикл
-    while(true) 
+    while(1) 
     {
         int num;
         printf("Enter the line number (0 to exit): ");
