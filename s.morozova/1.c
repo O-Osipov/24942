@@ -54,7 +54,7 @@ void print_process_ids(){
 
 void print_ulimit(){
     printf("\n");
-    printf("ulimit: %ld\n", ulimit(0));
+    printf("ulimit: %ld\n", sysconf(_SC_CHILD_MAX));
 }
 
 void change_ulimit(const char *value){
