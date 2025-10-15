@@ -103,27 +103,17 @@ int main(int argc, char* argv[])
 
             case 'u':
                 #ifdef __sun
-                    snprintf(cmd, sizeof(cmd), "prctl -n process.max -t process %d 2>/dev/null", getpid());
-                    fp = popen(cmd, "r");
+                    fp = popen("prctl -n project.max-processes $$ 2>/dev/null", "r");
                     if (fp)
                     {
                         char buf[256];
-                        int has_output = 0;
                         printf("Ограничение на количество процессов (Solaris):\n");
                         while (fgets(buf, sizeof(buf), fp))
                         {
-                            has_output = 1;
                             fputs(buf, stdout);
                         }
                         pclose(fp);
-                        if (!has_output)
-                        {
-                            printf(" (нет ограничений или нет доступа к информации)\n");
-                        }
-                    }
-                    else
-                    {
-                        printf("Информация о лимите процессов недоступна.\n");
+
                     }
                 #else
                     print_limit("Ограничение на количество процессов", RLIMIT_NPROC);
@@ -140,7 +130,7 @@ int main(int argc, char* argv[])
                         break;
                     }
 
-                    snprintf(cmd, sizeof(cmd), "prctl -n process.max -s %ld -t process %d 2>/dev/null", val, getpid());
+                    snprintf(cmd, sizeof(cmd), "ulimit -u %ld 2>/dev/null", val);
                     int ret = system(cmd);
                     if (ret != 0)
                     {
