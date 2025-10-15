@@ -2,6 +2,47 @@
 #include <string.h>
 #include <stdlib.h>
 
+
+//delete escape sequences from string
+void remove_escape_sequences(char *str)
+{
+int i = 0;
+int j = 0;
+while(str[i] != '\0')
+{
+//if found ESC symbol
+if( (unsigned char)str[i] == '\x1B') // or 27
+	{
+//Skip ESC and next symnols until character
+i++; // skip ESC
+while( str[i] != '\0' &&
+	str[i] != 'A' &&
+	str[i] != 'B' && str[i] != 'B' &&
+	str[i] != 'C' &&
+	str[i] != 'D' &&
+	str[i] != '~')
+{
+i++;
+}
+if (str[i] != '\0') i++;
+
+	}
+else
+   {
+//copy simple symb
+	str[j] = str[i];
+	j++;
+	i++;
+
+   }
+
+}
+
+str[j] = '\0'; //end string
+
+}
+
+
 struct Node
 {
     char *data; //строка
