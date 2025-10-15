@@ -8,6 +8,7 @@
 #include <string.h>
 #include <errno.h>
 #include <limits.h>
+#include <sys/resource.h>
 
 void print_ids(); // Печать идентификаторов пользователя и группы
 void become_leader_group(); // Стать лидером группы
@@ -21,7 +22,7 @@ void print_env(char *envp[]); // Распечатывает переменные
 void set_env_var(const char*); // Вносит новую переменную в среду или изменяет значение существующей переменной
 
 
-int main(int argc, char argv*[], char *envp[])
+int main(int argc, char** argv, char *envp[])
 {
     int opt;
     while( (opt = getopt(argc,argv, "ispuU:cC:dvV:")) != -1)
@@ -38,7 +39,7 @@ int main(int argc, char argv*[], char *envp[])
             case 'd': print_cwd(); break;
             case 'v': print_env(envp); break;
             case 'V': set_env_var(optarg); break;
-            default: usage(); exit(EXIT_FAILURE);
+            default: exit(EXIT_FAILURE);
         }
     }
     return 0;
@@ -140,7 +141,7 @@ void print_env(char *envp[])
 
 void set_env_var(const char* assignment)
 {
-    char* equals = strchr(assignment, '=') // возвращает указатель на первое вхождение '='
+    char* equals = strchr(assignment, '='); // возвращает указатель на первое вхождение '='
     if(!equals)
     {
         fprintf(stderr, "Invalid environment assignment: %s\n", assignment);
