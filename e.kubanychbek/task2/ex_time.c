@@ -1,4 +1,4 @@
-#define __EXTENSIONS__
+
 #include <sys/types.h>
 #include <stdio.h>
 #include <time.h> 
