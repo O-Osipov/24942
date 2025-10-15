@@ -2,7 +2,7 @@
 #include <fcntl.h>
 #include <unistd.h>
 #include <stdio.h>
-#include <sys/select.h>
+#include <signal.h>
 
 typedef struct {
     off_t offset;
@@ -14,6 +14,9 @@ typedef struct {
     int cnt;
     int cap;
 } Table;
+
+Table table;
+int fd;
 
 void init_table(Table *a) {
     a->table = malloc(sizeof(Row));
@@ -46,14 +49,22 @@ void print_row(Row row, int fd) {
     free(buf);
 }
 
+void timeout_handler(int sig) {
+    printf("\n\nTime is up! Printing all lines:\n\n");
+    for (int i = 0; i < table.cnt; i++)
+        print_row(table.table[i], fd);
+    free_table(&table);
+    close(fd);
+    exit(0);
+}
+
 int main(int argc, char *argv[]) {
     if (argc != 2) { return 1; }
     char *path = argv[1];
 
-    Table table;
     init_table(&table);
-
-    int fd = open(path, O_RDONLY);
+    
+    fd = open(path, O_RDONLY);
     if (fd == -1) { return 1; }
     lseek(fd, 0L, SEEK_CUR);
 
@@ -77,28 +88,18 @@ int main(int argc, char *argv[]) {
         insert_row(&table, current);
     }
 
-    fd_set fdset;
-    struct timeval timeout;
+    signal(SIGALRM, timeout_handler);
 
     while (1) {
         printf("Enter the line number: ");
 
         fflush(stdout);
 
-        FD_ZERO(&fdset);
-        FD_SET(STDIN_FILENO, &fdset);
-        timeout.tv_sec = 5;
-        timeout.tv_usec = 0;
-
-        if (!select(1, &fdset, NULL, NULL, &timeout)) {
-            printf("\n\n");
-            for(int i = 0; i < table.cnt; i++)
-                print_row(table.table[i], fd);
-            return 0;
-        }
+        alarm(5);
 
         int num;
-        scanf("%d", &num);
+        if (scanf("%d", &num) != 1) { break; }
+        alarm(0);
 
         if (num == 0) { break; }
         if (table.cnt < num) {
@@ -107,13 +108,7 @@ int main(int argc, char *argv[]) {
         }
 
         Row row = table.table[num - 1];
-        char *buf = calloc(row.length + 1, sizeof(char));
-
-        lseek(fd, row.offset, SEEK_SET);
-        read(fd, buf, row.length * sizeof(char));
-
-        printf("%s\n", buf);
-        free(buf);
+        print_row(row, fd);
     }
 
     close(fd);

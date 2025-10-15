@@ -2,7 +2,7 @@
 #include <fcntl.h>
 #include <unistd.h>
 #include <stdio.h>
-#include <sys/select.h>
+#include <signal.h>
 #include <sys/mman.h>
 #include <sys/stat.h>
 
@@ -16,6 +16,9 @@ typedef struct {
     int cnt;
     int cap;
 } Table;
+
+Table table;
+char *mapped;
 
 void init_table(Table *a) {
     a->table = malloc(sizeof(Row));
@@ -38,18 +41,25 @@ void free_table(Table *a) {
     a->cnt = a->cap = 0;
 }
 
-void print_row(Row row, const char *mapped) {
+void print_row(Row row, char *mapped) {
     for (int i = 0; i < row.length; i++) {
         printf("%c", mapped[row.offset + i]);
     }
     printf("\n");
 }
 
+void timeout_handler(int sig) {
+    printf("\n\nTime is up! Printing all lines:\n\n");
+    for (int i = 0; i < table.cnt; i++)
+        print_row(table.table[i], mapped);
+    free_table(&table);
+    exit(0);
+}
+
 int main(int argc, char *argv[]) {
     if (argc != 2) { return 1; }
     char *path = argv[1];
 
-    Table table;
     init_table(&table);
 
     int fd = open(path, O_RDONLY);
@@ -59,7 +69,7 @@ int main(int argc, char *argv[]) {
     if (fstat(fd, &file_info) == -1) { return 1; }
     size_t size = file_info.st_size;
 
-    const char *mapped = mmap(NULL, size, PROT_READ, MAP_PRIVATE, fd, 0);
+    mapped = mmap(NULL, size, PROT_READ, MAP_PRIVATE, fd, 0);
     if (mapped == MAP_FAILED) { return 1; }
     close(fd);
 
@@ -84,28 +94,18 @@ int main(int argc, char *argv[]) {
         insert_row(&table, current);
     }
 
-    fd_set fdset;
-    struct timeval timeout;
+    signal(SIGALRM, timeout_handler);
 
     while (1) {
         printf("Enter the line number: ");
 
         fflush(stdout);
 
-        FD_ZERO(&fdset);
-        FD_SET(STDIN_FILENO, &fdset);
-        timeout.tv_sec = 5;
-        timeout.tv_usec = 0;
-
-        if (!select(1, &fdset, NULL, NULL, &timeout)) {
-            printf("\n\n");
-            for(int i = 0; i < table.cnt; i++)
-                print_row(table.table[i], mapped);
-            return 0;
-        }
+        alarm(5);
 
         int num;
-        scanf("%d", &num);
+        if (scanf("%d", &num) != 1) { break; }
+        alarm(0);
 
         if (num == 0) { break; }
         if (table.cnt < num) {
@@ -117,7 +117,6 @@ int main(int argc, char *argv[]) {
         print_row(row, mapped);
     }
 
-    
     munmap((void *) mapped, size);
     free_table(&table);
 
