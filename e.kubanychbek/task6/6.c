@@ -117,20 +117,20 @@ int main(int argc, char *argv[]){
     
     printf("\nВсего строк в файле: %d\n", line_count);
     
-    //Шаг 2: Интерактивный запрос строк с ограничением времени
+    //Интерактивный запрос строк с ограничением времени
     printf("\n===Интерактивный режим===\n");
     printf("У вас есть %d секунд чтобы ввести номер строки\n", TIMEOUT);
     printf("Введите номер строки (1-%d) или 0 для выхода:\n", line_count);
 
     // Устанавливаем обработчик сигнала ALARM
     signal(SIGALRM, alarm_handler);
+
     alarm(TIMEOUT);    
     while(1){
         timeout_occurred = 0;
-        
-        // Устанавливаем будильник на 5 секунд
- 
-        
+    alarm(TIMEOUT);
+    while(1){
+        timeout_occurred = 0;
         printf("> ");
         fflush(stdout); // важно для вывода промпта
         
