@@ -103,18 +103,13 @@ int main(int argc, char* argv[])
 
             case 'u':
                 #ifdef __sun
-                    fp = popen("prctl -n project.max-processes $$ 2>/dev/null", "r");
-                    if (fp)
+                    fp = popen("ulimit -u 2>/dev/null", "r");
+                    if (fp && fgets(buf, sizeof(buf), fp))
                     {
-                        char buf[256];
-                        printf("Ограничение на количество процессов (Solaris):\n");
-                        while (fgets(buf, sizeof(buf), fp))
-                        {
-                            fputs(buf, stdout);
-                        }
-                        pclose(fp);
-
+                        printf("Ограничение через ulimit: %s", buf);
                     }
+                    if (fp)
+                        pclose(fp);
                 #else
                     print_limit("Ограничение на количество процессов", RLIMIT_NPROC);
                 #endif
