@@ -93,7 +93,9 @@ int main()
 
     s.sa_handler = new_alarm;
     sigaction(SIGALRM, &s, NULL);
+    fflush(stdout);
 
+    alarm(5);
     while (1)
     {
         int n;
@@ -103,8 +105,7 @@ int main()
         printf("Введите номер строки (0 для выхода): ");
         fflush(stdout);
 
-        alarm(5);
-
+   
         int i = 0;
         while (i < sizeof(buffer) - 1)
         {
