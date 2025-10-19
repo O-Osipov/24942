@@ -19,7 +19,7 @@ int try_open_write(const char *path){
 }
 
 int main(int argc, char *argv[]){
-    if (argv != 2){
+    if (argc != 2){
         fprintf(stderr, "Usage: %s <filename>\n", argv[0]);
     }
     const char *filename = argv[1];
