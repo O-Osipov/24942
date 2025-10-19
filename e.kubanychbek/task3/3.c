@@ -9,7 +9,7 @@ void print_uids(const char *label){
 }
 
 int try_open_write(const char *path){
-    FILE *f = fopen(path, "W");
+    FILE *f = fopen(path, "w");
     if (f == NULL){
         perror("fopen (w) failed");
         return -1;
