@@ -38,12 +38,12 @@ int main(int argc, char *argv[]) {
         }
         
         if (WIFEXITED(status)) { //wait if exited
-            printf("Child process completed successfully with exit code: %d\n", WEXITSTATUS(status));
+            printf("\nChild process completed successfully with exit code: %d\n", WEXITSTATUS(status));
         } else {
-            printf("Child process terminated abnormally\n");
+            printf("\nChild process terminated abnormally\n");
         }
         
-        // This line prints AFTER child process completes
+        // This line prints after child process completes
         printf("\n=== PARENT'S FINAL MESSAGE: Child process has finished! ===\n");
     }
     
