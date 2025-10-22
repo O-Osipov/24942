@@ -12,10 +12,23 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <ctype.h>
-#include <sys/ttydefaults.h>
 #include <string.h>
 
 #define LINE_LENGTH 40
+
+// Define control characters for Solaris compatibility
+#ifndef CERASE
+#define CERASE '\b'    // Backspace
+#endif
+#ifndef CKILL
+#define CKILL '\025'   // Ctrl+U (kill line)
+#endif
+#ifndef CWERASE
+#define CWERASE '\027'  // Ctrl+W (kill word)
+#endif
+#ifndef CEOF
+#define CEOF '\004'    // Ctrl+D (EOF)
+#endif
 struct termios orig_termios;
 
 void disableRawMode() {
