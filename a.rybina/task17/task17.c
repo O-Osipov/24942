@@ -41,6 +41,8 @@ void enableRawMode() {
 
     struct termios raw = orig_termios;
     raw.c_lflag &= ~(ECHO | ICANON);
+    raw.c_cc[VMIN] = 1;   // minimum number of bytes for read
+    raw.c_cc[VTIME] = 0;  // no read timeout (in deciseconds)
     tcsetattr(STDIN_FILENO, TCSAFLUSH, &raw);
 }
 
