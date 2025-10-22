@@ -7,7 +7,6 @@
 #include <string.h>
 #include <errno.h>
 #include <ulimit.h>
-#include <bits/getopt_core.h>
 
 // -i  Печатает реальные и эффективные идентификаторы пользователя и группы.
 // -s  Процесс становится лидером группы. Подсказка: смотри setpgid(2).
