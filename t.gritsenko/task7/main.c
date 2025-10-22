@@ -74,6 +74,7 @@ void print_table(Table a) {
     printf("+------------+------------+------------+----------------------------------------------+\n");
 }
 
+
 void timeout_handler(int sig) {
     printf("\nTime is up!\n");
     print_table(table);
@@ -98,13 +99,15 @@ int main(int argc, char *argv[]) {
     if (mapped == MAP_FAILED) { return 1; }
     close(fd);
 
+    int line_number = 0;
     off_t line_offset = 0;
     off_t line_length = 0;
 
     for (int i = 0; i < size; i++) {
         char c = mapped[i];
         if (c == '\n') {
-            Row current = {line_offset, line_length};
+            line_number++;
+            Row current = {line_number, line_offset, line_length};
             insert_row(&table, current);
 
             line_offset += line_length + 1;
@@ -115,7 +118,8 @@ int main(int argc, char *argv[]) {
     }
 
     if (line_length > 0) {
-        Row current = {line_offset, line_length};
+        line_number++;
+        Row current = {line_number, line_offset, line_length};
         insert_row(&table, current);
     }
 
@@ -143,6 +147,7 @@ int main(int argc, char *argv[]) {
         printf("Enter the line number: ");
         fflush(stdout);
         if (scanf("%d", &num) != 1) { break; }
+
     }
 
     munmap((void *) mapped, size);
