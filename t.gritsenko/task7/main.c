@@ -132,9 +132,19 @@ int main(int argc, char *argv[]) {
     int num;
     if (scanf("%d", &num) != 1) { return 1; }
     alarm(0);
+    if (num == 0) { return 0; }
+    if (table.cnt < num) {
+        printf("The file contains only %d line(s).\n", table.cnt);
+    } else {
+        Row row = table.table[num - 1];
+        print_row(row, mapped);
+    }
 
     while (1) {
 
+        printf("Enter the line number: ");
+        fflush(stdout);
+        if (scanf("%d", &num) != 1) { break; }
         if (num == 0) { break; }
         if (table.cnt < num) {
             printf("The file contains only %d line(s).\n", table.cnt);
@@ -143,11 +153,6 @@ int main(int argc, char *argv[]) {
 
         Row row = table.table[num - 1];
         print_row(row, mapped);
-
-        printf("Enter the line number: ");
-        fflush(stdout);
-        if (scanf("%d", &num) != 1) { break; }
-
     }
 
     munmap((void *) mapped, size);
