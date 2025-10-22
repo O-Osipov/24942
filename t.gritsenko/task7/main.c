@@ -5,8 +5,10 @@
 #include <signal.h>
 #include <sys/mman.h>
 #include <sys/stat.h>
+#include <inttypes.h>
 
 typedef struct {
+    int line_number;
     off_t offset;
     off_t length;
 } Row;
@@ -48,10 +50,33 @@ void print_row(Row row, char *mapped) {
     printf("\n");
 }
 
+void print_table(Table a) {
+    if (a.cnt == 0) {
+        printf("(Table is empty.)\n");
+        return;
+    }
+
+    printf("\n");
+    printf("+------------+------------+------------+----------------------------------------------+\n");
+    printf("|  Line Num  |   Offset   |   Length   | Text                                         |\n");
+    printf("+------------+------------+------------+----------------------------------------------+\n");
+
+    for (int i = 0; i < a.cnt; i++) {
+        Row row = a.table[i];
+
+        printf("| %10d | %10jd | %10jd | ",
+               row.line_number,
+               (intmax_t)row.offset,
+               (intmax_t)row.length);
+        print_row(row, mapped);
+    }
+
+    printf("+------------+------------+------------+----------------------------------------------+\n");
+}
+
 void timeout_handler(int sig) {
-    printf("\n\nTime is up! Printing all lines:\n\n");
-    for (int i = 0; i < table.cnt; i++)
-        print_row(table.table[i], mapped);
+    printf("\nTime is up!\n");
+    print_table(table);
     free_table(&table);
     exit(0);
 }
@@ -96,16 +121,15 @@ int main(int argc, char *argv[]) {
 
     signal(SIGALRM, timeout_handler);
 
+    printf("Enter the line number: ");
+    fflush(stdout);
+    alarm(5);
+
+    int num;
+    if (scanf("%d", &num) != 1) { return 1; }
+    alarm(0);
+
     while (1) {
-        printf("Enter the line number: ");
-
-        fflush(stdout);
-
-        alarm(5);
-
-        int num;
-        if (scanf("%d", &num) != 1) { break; }
-        alarm(0);
 
         if (num == 0) { break; }
         if (table.cnt < num) {
@@ -115,6 +139,10 @@ int main(int argc, char *argv[]) {
 
         Row row = table.table[num - 1];
         print_row(row, mapped);
+
+        printf("Enter the line number: ");
+        fflush(stdout);
+        if (scanf("%d", &num) != 1) { break; }
     }
 
     munmap((void *) mapped, size);
