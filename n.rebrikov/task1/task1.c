@@ -73,23 +73,28 @@ void print_ulimit()
     printf("Max child processes per user: %ld\n", sysconf(_SC_CHILD_MAX));
 }
 
-void set_ulimit(const char* str)
-{
-    long new_size = strtol(str,NULL,10);
-    if(errno == ERANGE)
-    {
+void set_ulimit(const char* str) {
+    // Пытаемся установить одно из доступных ограничений
+    long new_size = strtol(str, NULL, 10);
+    if(errno == ERANGE) {
         fprintf(stderr, "Invalid ulimit value: %s\n", str);
         return;
     }
+    
     struct rlimit rl;
-    rl.rlim_cur = new_size;
-    rl.rlim_max = new_size;
-
-    if(setrlimit(RLIMIT_FSIZE, &rl) == -1)
-    {
-        perror("setrlimit failed");
+    
+    // Пробуем установить ограничение на открытые файлы (обычно доступно)
+    if(getrlimit(RLIMIT_NOFILE, &rl) == 0) {
+        rl.rlim_cur = new_size;
+        if(setrlimit(RLIMIT_NOFILE, &rl) == 0) {
+            printf("Max open files set to: %ld\n", new_size);
+            return;
+        }
     }
+    
+    fprintf(stderr, "Failed to set ulimit on Solaris\n");
 }
+
 
 void print_core_size()
 {
