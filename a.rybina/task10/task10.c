@@ -1,7 +1,10 @@
 // Напишите программу, которая запускает команду, заданную в качестве первого аргумента, в виде порожденного процесса. Все остальные аргументы программы передаются этой команде. Затем программа должна дождаться завершения порожденного процесса и распечатать его код завершения.
 
+//./task10 cat ./test.txt 
+//./task10 ls -la
+
 #include <stdio.h>
-#include <stdlib.h>
+#include <stdlib.h> 
 #include <unistd.h>
 #include <sys/wait.h>
 
@@ -37,11 +40,11 @@ int main(int argc, char *argv[]) {
         }
 
         if (WIFEXITED(status)) {
-            printf("Child process completed with exit code: %d\n", WEXITSTATUS(status));
+            printf("\nChild process completed with exit code: %d\n", WEXITSTATUS(status));
         } else if (WIFSIGNALED(status)) {
-            printf("Child process was killed by signal: %d\n", WTERMSIG(status));
+            printf("\nChild process was killed by signal: %d\n", WTERMSIG(status));
         } else {
-            printf("Child process terminated abnormally\n");
+            printf("\n  Child process terminated abnormally\n");
         }
     }
     
