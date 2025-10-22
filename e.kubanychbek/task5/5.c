@@ -7,6 +7,10 @@
 #include <fcntl.h>  //open, O_RDONLY
 #include <sys/types.h>  
 #include <sys/stat.h>
+#include <errno.h>
+#include <string.h> 
+#include <ctype.h>
+
 
 #define MAX_LINES 10000 //макс кол-во строк в файле
 #define MAX_LINE_LENGTH 256 //макс длина одной строки
@@ -17,113 +21,151 @@ typedef struct{
     int length;  //длина строки(без символа новой строки)
 } LineInfo;
 
+static int read_int_from_stdin(long min, long max, long *out){
+    char buf[64];
+
+    if (!fgets(buf, sizeof(buf), stdin)){   //EOF (Ctrl+D) или ошибка
+        return 0;                           // сообщим вызываещему - надо выйти 
+    }
+
+    //если строка длиннее нашего буфера - выбросим остаток до \n
+    if (strchr(buf, '\n') == NULL){
+        int c;
+        while ((c = getchar()) != '\n' && c != EOF){}
+    }
+
+    //уберем пробелы по краям
+    char *p = buf;
+    while (isspace((unsigned char)*p)) p++;
+    char *end = p + strlen(p);
+    while (end > p && isspace((unsigned char)end[-1])) end--;
+    *end = '\0';
+
+    if (*p == '\0'){
+        fprintf(stderr, "Пустой ввод. Повторите.\n");
+        return -1;                                       //неверный ввод но stdin жив
+    }
+
+    errno = 0;
+    char *q = NULL;
+    long v = strtol(p, &q, 10);
+
+    if (errno == ERANGE){
+        fprintf(stderr, "Число вне диапозона long. Повторите.\n");
+        return -1;
+    }
+    if (q == p || *q != '\0'){
+        fprintf (stderr, "Ожидалось целое число. Повторите.\n");
+        return -1;
+    }
+
+    if (v < min || v > max) {
+        fprintf(stderr, "Число должно быть от %ld до %ld.\n", min, max);
+        return -1;
+    }
+
+    *out = v;
+    return 1;   //успех
+}
+
 int main(int argc, char *argv[]){
-    int fd;   //файловый дескриптор (целое число, идентификатор открытого файла)
-    char ch;  //для чтения по одному символу
-    LineInfo lines[MAX_LINES]; // таблица информации о строках
-    int line_count = 0;        // счетчик строк, тех которые уже обработаны
-    long current_offset = 0;   // текущая позиция в файле(в байтах)
-    int line_length = 0;       // длина текущей (обрабатываемой)строки 
-    int line_number;           // номер строки для запроса, то есть от пользователя
+    int fd;
+    char ch;
+    LineInfo lines[MAX_LINES];
+    int line_count = 0;
+    long current_offset = 0;
+    int line_length = 0;
 
-
-    // проверяем аргументы командной строки
     if (argc != 2){
         printf("Использование: %s <filename>\n", argv[0]);
-        exit(1);
+        return 1;
     }
-    fd = open(argv[1], O_RDONLY);//если успешно открыл, то возвращает неотрицательное число 
-    //O_RDONLY - означает "Открыть только для чтения"
+    fd = open(argv[1], O_RDONLY);
     if (fd == -1){
         perror("Ошибка открытия файла");
-        exit(1);
+        return 1;
     }
-    
     printf("Файл '%s' успешно открыт\n", argv[1]);
 
-    //Построение таблицы смещений и длин строк
-    printf("\n===ПОСТРОЕНИЕ ТАБЛИЦЫ СТРОК===\n");
-    lines[0].offset = 0; //первая строка начинаеся с поз-и 0
-    //читаем файл по одному символу
-    while (read(fd, &ch, 1) > 0){
-        line_length ++; 
+    // Построение таблицы строк
+    printf("\n=== ПОСТРОЕНИЕ ТАБЛИЦЫ СТРОК ===\n");
+    lines[0].offset = 0;
 
-        //если встретили символ новой строки 
+    ssize_t r;
+    while ((r = read(fd, &ch, 1)) > 0){
+        line_length++;
         if (ch == '\n'){
-            //сохраняем информацию о текущей строке 
-            lines[line_count].length = line_length - 1; //-1 чтобы исключить /n
-            printf("Строка %d: смещение = %ld, длина = %d\n", 
-            line_count + 1, lines[line_count].offset, lines[line_count].length);
-
+            lines[line_count].length = line_length - 1;
+            printf("Строка %d: смещение = %ld, длина = %d\n",
+                   line_count + 1, lines[line_count].offset, lines[line_count].length);
             line_count++;
-
-            //получаем текущую позицию для начала следующей строки 
-            current_offset = lseek(fd, 0L, SEEK_CUR);
-
-            //защита от переполнения 
-            if (line_count < MAX_LINES){
-                lines[line_count].offset = current_offset;
+            if (line_count >= MAX_LINES) {
+                fprintf(stderr, "Достигнут лимит %d строк. Остальные игнорируются.\n", MAX_LINES);
+                break;
             }
-            line_length = 0; //сбрасываем счетчик длины для новой строки 
+            current_offset = lseek(fd, 0L, SEEK_CUR);
+            lines[line_count].offset = current_offset;
+            line_length = 0;
         }
     }
+    if (r < 0) {
+        perror("Ошибка чтения файла");
+        close(fd);
+        return 1;
+    }
 
-    //обраабатываем последнюю строчку, если файл не заканчивается на \n
     if (line_length > 0 && line_count < MAX_LINES){
         lines[line_count].length = line_length;
         printf("Строка %d: смещение = %ld, длина = %d\n",
-        line_count + 1, lines[line_count].offset, lines[line_count].length);
+               line_count + 1, lines[line_count].offset, lines[line_count].length);
         line_count++;
-    } 
+    }
     printf("\nВсего строк в файле: %d\n", line_count);
-    
-    //Шаг 2: Интерактивный запрос строк 
-    printf("\n===Интерактивный режим===\n");
+
+    // Интерактивный режим
+    printf("\n=== Интерактивный режим ===\n");
     printf("Введите номер строки (1-%d) или 0 для выхода:\n", line_count);
 
-    while(1){
-        printf(">");
-        scanf("%d", &line_number);
-
-        //выход из программы 
-        if (line_number == 0){
+    for (;;) {
+        printf("> ");
+        long ln;
+        int rc = read_int_from_stdin(0, line_count, &ln);
+        if (rc == 0) {                          // EOF
+            printf("\nВыход (EOF)\n");
+            break;
+        }
+        if (rc < 0) {                           // некорректный ввод
+            continue;
+        }
+        if (ln == 0) {
             printf("Выход из программы\n");
             break;
         }
 
-        //проверка корректности номера строки
-        if (line_number < 1 || line_number > line_count){
-            printf("Ошибка - номер строки должен быть от 1 до %d\n", line_count);
-            continue;
-        }
-
-        //получим информацию о запрошенной строке 
-        int index = line_number - 1; //индексация с 0
+        int index = (int)ln - 1;
         long offset = lines[index].offset;
-        int length = lines[index].length;
+        int  length = lines[index].length;
 
-        printf("Строка %d: смещение = %ld, длина = %d\n", line_number, offset, length);
+        printf("Строка %ld: смещение = %ld, длина = %d\n", ln, offset, length);
         printf("Содержимое: ");
 
-        //перемещаемся к началу строки 
         if (lseek(fd, offset, SEEK_SET) == -1) {
-            perror("ошибка позиционирования");
+            perror("Ошибка позиционирования");
             continue;
         }
 
-        //читаем и выводим строку
+        // печатаем безопасно: если строка длиннее нашего буфера — обрежем вывод
         char buffer[MAX_LINE_LENGTH];
-        int bytes_read = read(fd, buffer, length);
-
-        if (bytes_read > 0){
-            //добавляем нулевой терминатор 
-            buffer[bytes_read] = '\0';
-            printf("'%s'\n", buffer);
-        } else {
-            printf("Ошибка чтения строки\n");
+        int to_read = length < (MAX_LINE_LENGTH - 1) ? length : (MAX_LINE_LENGTH - 1);
+        ssize_t bytes_read = read(fd, buffer, to_read);
+        if (bytes_read < 0) {
+            perror("Ошибка чтения строки");
+            continue;
         }
+        buffer[bytes_read] = '\0';
+        printf("'%s'%s\n", buffer, (length > to_read) ? " ...[обрезано]" : "");
     }
-    //закрываем файл
+
     close(fd);
-    return 0; 
+    return 0;
 }

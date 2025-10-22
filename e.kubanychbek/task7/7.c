@@ -1,309 +1,290 @@
 /*
-    Программа для индексации и произвольного доступа к строкам файла
-    ВАРИАНТ С MMAP: файл отображается в память, чтение идёт из памяти,
-    НЕТ использования read(2)/lseek(2)/write(2) для чтения содержимого файла.
+    Индексация строк с отображением файла в память (mmap).
+    Таймер SIGALRM — только на первый ввод; далее бесконечный выбор строк.
+    Безопасный ввод: fgets + strtol. Доступ к файлу — через mmap (без read/lseek).
 */
 
-#define __EXTENSIONS__ /* ADDED: для Solaris — раскрывает расширения в заголовках */
-#include <stdio.h>
-#include <stdlib.h>     // exit
-#include <unistd.h>     // close, alarm /* REMOVED: read, lseek из использования */
-#include <fcntl.h>      // open, O_RDONLY
-#include <sys/types.h>
-#include <sys/stat.h>   // fstat
-#include <signal.h>     // signal
-#include <sys/mman.h>   // ADDED: mmap, munmap
-#include <string.h>     // memchr
-#include <errno.h>
+#define _XOPEN_SOURCE 700          // просим интерфейсы POSIX.1-2008
+#include <stdio.h>                 // printf, puts, fwrite
+#include <stdlib.h>                // exit, size_t
+#include <unistd.h>                // close, alarm
+#include <fcntl.h>                 // open, O_RDONLY
+#include <sys/types.h>             // типы для системных вызовов
+#include <sys/stat.h>              // fstat, S_ISREG
+#include <signal.h>                // sigaction, SIGALRM
+#include <sys/mman.h>              // mmap, munmap
+#include <string.h>                // strlen, strchr
+#include <ctype.h>                 // isspace
+#include <errno.h>                 // errno, ERANGE
 
-#define MAX_LINES 10000         // макс кол-во строк в файле
-#define MAX_LINE_LENGTH 256     // макс длина одной строки при печати (защита)
-#define TIMEOUT 5               // время ожидания ввода в секундах
+#define MAX_LINES 10000            // максимум строк, которые индексируем
+#define MAX_LINE_LENGTH 256        // максимум символов для печати одной строки
+#define TIMEOUT 5                  // секунд на ПЕРВЫЙ ввод пользователя
 
-// структура для хранения инфы о строках
-typedef struct{
-    /* REMOVED: long offset;  -- long может быть узким
-       ADDED: используем off_t (POSIX тип для смещений), корректно под 64-бит */
-    off_t offset;    // смещение в байтах от начала файла
-    int   length;    // длина строки (без '\n')
+// Структура для индекса одной строки: смещение и длина (без '\n')
+typedef struct {
+    long offset;                   // смещение от начала файла (байты)
+    int  length;                   // длина строки без символа '\n'
 } LineInfo;
 
-/* === ГЛОБАЛЬНАЯ СЕКЦИЯ ДЛЯ MMAP === */
-volatile sig_atomic_t timeout_occurred = 0;
+// Глобальные для печати целого файла при таймауте
+volatile sig_atomic_t timeout_occurred = 0;  // флаг, выставляемый в обработчике SIGALRM
+const unsigned char *g_map = NULL;           // указатель на отображение файла (read-only)
+size_t g_size = 0;                           // размер файла (в байтах)
 
-/* REMOVED:
-int global_fd = -1;
-LineInfo *global_lines = NULL;
-int global_line_count = 0;
-*/
-
-/* ADDED: базовый адрес отображённого файла и размер */
-static const char *g_base = NULL;  // указатель на начало отображенного файла (read-only)
-static size_t      g_size = 0;     // размер файла (в байтах)
-static LineInfo    g_lines[MAX_LINES]; // индекс строк здесь
-static int         g_line_count = 0;   // число строк
-
-// обработка сигнала ALARM
-void alarm_handler(int sig){
-    (void)sig;
-    timeout_occurred = 1;
-    printf("\n\nВремя на ввод истекло! Выводим содержимое файла: \n");
+// ====== Обработчик SIGALRM: только помечаем флаг (асинхронно-безопасно) ======
+static void alarm_handler(int sig){
+    (void)sig;                   // не используем параметр
+    timeout_occurred = 1;        // никаких printf/stdlib — только атомарная запись флага
 }
 
-/* фун-ия для вывода всего содержимого файла */
-/* REMOVED: старая версия читала через lseek/read буферами
-void print_entire_file(){
-    if (global_fd == -1) return;
+// ====== Утилита: обрезка пробелов по краям (in-place) ======
+static void trim(char **pb, char **pe){
+    char *b=*pb, *e=*pe;
+    while (b<e && isspace((unsigned char)*b)) b++;      // сдвигаем начало до первого непробела
+    while (e>b && isspace((unsigned char)e[-1])) e--;   // сдвигаем конец к последнему непробелу
+    *pb=b; *pe=e;                                       // возвращаем обновлённые границы
+}
 
-    lseek(global_fd, 0L, SEEK_SET);
-    char buffer[1024];
-    int bytes_read; 
+// ====== Чтение числа С ТАЙМЕРОМ (только для первого ввода) ======
+// Возврат: 1 — успех, 0 — EOF, -1 — некорректный ввод, -2 — таймаут
+static int read_int_with_timeout(long min,long max,long *out){
+    char buf[64];                             // буфер для строки ввода
+    timeout_occurred = 0;                     // сброс флага перед запуском таймера
+    alarm(TIMEOUT);                           // включаем однократный будильник
+    char *res = fgets(buf, sizeof buf, stdin);// блокирующее чтение строки (прервётся SIGALRM)
+    alarm(0);                                 // выключаем таймер сразу после возврата из fgets
 
-    printf("_____ПОЛНОЕ СОДЕРЖИМОЕ ФАЙЛА_____\n");
-    while ((bytes_read = read(global_fd, buffer, sizeof(buffer) - 1)) > 0){
-        buffer[bytes_read] = '\0';
-        printf("%s", buffer);
+    if (!res){                                // NULL: либо EOF, либо прерывание
+        if (timeout_occurred) return -2;      // сработал таймер → сообщаем о таймауте
+        return 0;                             // иначе — EOF/ошибка ввода
     }
-    printf("\n_____КОНЕЦ ФАЙЛА_____\n");
+    if (!strchr(buf,'\n')){                   // строка не влезла целиком
+        int c;                                // дочищаем хвост до конца строки
+        while ((c=getchar())!='\n' && c!=EOF){}
+    }
+
+    char *p=buf, *e=buf+strlen(buf);          // p — начало, e — конец (за последним символом)
+    trim(&p,&e); *e='\0';                     // удаляем пробелы по краям и завершаем строку
+    if (*p=='\0'){ fprintf(stderr,"Пустой ввод. Повторите.\n"); return -1; }
+
+    errno=0; char *q=NULL;                    // парсим целое число с проверками
+    long v=strtol(p,&q,10);
+    if (errno==ERANGE){ fprintf(stderr,"Число вне диапазона long.\n"); return -1; }
+    if (q==p || *q!='\0'){ fprintf(stderr,"Ожидалось целое число.\n"); return -1; }
+    if (v<min || v>max){ fprintf(stderr,"Число должно быть от %ld до %ld.\n",min,max); return -1; }
+
+    *out=v;                                   // успех
+    return 1;
 }
-*/
 
-/* ADDED: версия печати всего файла напрямую из отображения */
-void print_entire_file_mmap(void){
-    if (!g_base || g_size == 0) return;
-    printf("_____ПОЛНОЕ СОДЕРЖИМОЕ ФАЙЛА_____\n");
-    /* Печатаем ровно g_size байт, независимо от наличия '\0' */
-    printf("%.*s", (int)g_size, g_base);
-    printf("\n_____КОНЕЦ ФАЙЛА_____\n");
+// ====== Чтение числа БЕЗ таймера (для всех последующих вводов) ======
+static int read_int_safe(long min,long max,long *out){
+    char buf[64];
+    if (!fgets(buf, sizeof buf, stdin)) return 0;     // EOF
+    if (!strchr(buf,'\n')){ int c; while ((c=getchar())!='\n' && c!=EOF){} } // дочистить хвост
+
+    char *p=buf, *e=buf+strlen(buf);
+    trim(&p,&e); *e='\0';
+    if (*p=='\0'){ fprintf(stderr,"Пустой ввод. Повторите.\n"); return -1; }
+
+    errno=0; char *q=NULL; long v=strtol(p,&q,10);
+    if (errno==ERANGE){ fprintf(stderr,"Число вне диапазона long.\n"); return -1; }
+    if (q==p || *q!='\0'){ fprintf(stderr,"Ожидалось целое число.\n"); return -1; }
+    if (v<min || v>max){ fprintf(stderr,"Число должно быть от %ld до %ld.\n",min,max); return -1; }
+
+    *out=v;
+    return 1;
 }
 
-/* ADDED: построение индекса строк по отображению
-   Идея: сканируем [g_base, g_base + g_size), находим '\n' через memchr,
-   для каждой строки фиксируем offset (от начала файла) и length (без '\n'). */
-int build_index_from_mmap(const char *base, size_t size, LineInfo *lines, int max_lines){
-    const char *p   = base;
-    const char *end = base + size;
-    int count = 0;
+// ====== Печать всего файла напрямую из mmap (при таймауте) ======
+static void print_entire_file(void){
+    if (!g_map || g_size==0) return;        // пустой файл или нет отображения
+    puts("\n\nВремя на ввод истекло! Выводим содержимое файла:");
+    puts("_____ПОЛНОЕ СОДЕРЖИМОЕ ФАЙЛА_____");
+    (void)fwrite(g_map, 1, g_size, stdout); // печатаем одним куском весь мэппинг
+    puts("\n_____КОНЕЦ ФАЙЛА_____");
+}
 
-    if (size == 0) return 0;          // пустой файл — строк нет
+// ====== Построение индекса строк поверх отображения (mmap) ======
+static int build_index_from_mmap(const unsigned char *base, size_t sz,
+                                 LineInfo *lines, int *pcount){
+    int count = 0;                           // сколько строк нашли
+    int cur_len = 0;                         // текущая длина строки
 
-    /* первая строка начинается с offset 0 */
-    if (count < max_lines) lines[count].offset = (off_t)0;
+    if (sz == 0){ *pcount = 0; return 0; }   // пустой файл
 
-    while (p < end){
-        /* ищем перевод строки в оставшемся фрагменте */
-        const char *nl = memchr(p, '\n', (size_t)(end - p));
-        if (nl){
-            if (count < max_lines){
-                /* длина = позиция \n минус начало текущей строки */
-                lines[count].length = (int)(nl - (base + lines[count].offset));
-                printf("Строка %d: смещение = %lld, длина = %d\n",
-                       count + 1, (long long)lines[count].offset, lines[count].length);
+    lines[0].offset = 0;                     // первая строка начинается в нуле
+
+    for (size_t i=0; i<sz; ++i){             // линейный проход по байтам файла
+        unsigned char ch = base[i];          // читаем байт из mmap (возможен page fault)
+        cur_len++;                           // наращиваем текущую длину
+        if (ch == '\n'){                     // конец строки?
+            if (count < MAX_LINES){          // не переполняем индекс
+                lines[count].length = cur_len - 1; // без '\n'
+                printf("Строка %d: смещение = %ld, длина = %d\n",
+                       count+1, lines[count].offset, lines[count].length);
+                count++;
+                if (count < MAX_LINES){
+                    lines[count].offset = (long)(i+1); // начало следующей строки
+                } else {
+                    fprintf(stderr,"Достигнут лимит %d строк. Остальные игнорируются.\n", MAX_LINES);
+                }
             }
-            count++;
-            if (count >= max_lines) break;
-
-            /* следующая строка начинается сразу после '\n' */
-            lines[count].offset = (off_t)((nl + 1) - base);
-            p = nl + 1;
-        } else {
-            /* последняя строка (без '\n' до конца файла) */
-            if (count < max_lines){
-                lines[count].length = (int)((end - base) - lines[count].offset);
-                printf("Строка %d: смещение = %lld, длина = %d\n",
-                       count + 1, (long long)lines[count].offset, lines[count].length);
-            }
-            count++;
-            break;
+            cur_len = 0;                     // сбрасываем длину для новой строки
         }
     }
 
-    return count;
+    // Если файл не оканчивался '\n' — добавим последнюю строку
+    if (cur_len > 0 && count < MAX_LINES){
+        lines[count].length = cur_len;
+        printf("Строка %d: смещение = %ld, длина = %d\n",
+               count+1, lines[count].offset, lines[count].length);
+        count++;
+    }
+
+    *pcount = count;                         // вернём количество строк
+    return 0;
 }
 
 int main(int argc, char *argv[]){
-    int fd; // файловый дескриптор
-    /* REMOVED:
-    char ch; // для чтения по одному символу
-    LineInfo lines[MAX_LINES];
-    int line_count = 0; // счетчик строк
-    long current_offset = 0; // текущая позиция
-    int line_length = 0; // длина текущей строки
-    */
-    int line_number; // номер строки для запроса 
+    int fd = -1;                             // файловый дескриптор
+    struct stat st;                          // для fstat (метаданные файла)
+    LineInfo lines[MAX_LINES];               // индекс строк
+    int line_count = 0;                      // количество строк
 
-    // проверяем аргументы командной строки 
-    if (argc != 2){
-        printf("Использование: %s <filename>\n", argv[0]);
-        exit(1);
-    }
-    
-    fd = open(argv[1], O_RDONLY);
-    if (fd == -1){
-        perror("Ошибка открытия файла");
-        exit(1);
+    if (argc != 2){                          // проверяем аргументы
+        fprintf(stderr,"Использование: %s <filename>\n", argv[0]);
+        return 1;
     }
 
-    /* REMOVED: глобальные переменные, завязанные на fd/lines
-    global_fd = fd;
-    global_lines = lines;
-    */
+    fd = open(argv[1], O_RDONLY);            // открываем файл только для чтения
+    if (fd == -1){ perror("Ошибка открытия файла"); return 1; }
 
-    printf("Файл '%s' успешно открыт\n", argv[1]);
-
-    /* ADDED: узнаём размер файла и отображаем его в память */
-    struct stat st;
-    if (fstat(fd, &st) == -1){
+    if (fstat(fd, &st) == -1){               // узнаём размер и тип
         perror("fstat");
         close(fd);
-        exit(1);
+        return 1;
     }
-    if (!S_ISREG(st.st_mode)){
-        fprintf(stderr, "Ошибка: '%s' не является обычным файлом\n", argv[1]);
+    if (!S_ISREG(st.st_mode)){               // запрещаем отображать не-обычные файлы
+        fprintf(stderr,"Файл не является обычным.\n");
         close(fd);
-        exit(1);
+        return 1;
     }
-    g_size = (size_t)st.st_size;
 
-    if (g_size == 0){
-        printf("Пустой файл.\n");
+    size_t fsize = (size_t)st.st_size;       // безопасно приводим размер файла
+    const unsigned char *map = NULL;         // сюда придёт адрес отображения
+
+    if (fsize > 0){                          // пустой файл нельзя отобразить размером 0
+        void *addr = mmap(NULL,              // адрес выбирает ядро
+                          fsize,             // размер отображения = размер файла
+                          PROT_READ,         // только чтение
+                          MAP_PRIVATE,       // приватное (COW); нам запись не нужна
+                          fd,                // дескриптор файла
+                          0);                // смещение в файле (с начала)
+        if (addr == MAP_FAILED){
+            perror("mmap");
+            close(fd);
+            return 1;
+        }
+        map = (const unsigned char*)addr;    // сохраняем как байтовый указатель
+    } else {
+        map = NULL;                          // пустой файл
+    }
+
+    g_map = map;                             // глобальные для печати при таймауте
+    g_size = fsize;
+
+    printf("Файл '%s' успешно открыт, размер: %zu байт\n", argv[1], fsize);
+
+    // Строим индекс строк, сканируя байты прямо в mmap
+    printf("\n=== ПОСТРОЕНИЕ ТАБЛИЦЫ СТРОК (mmap) ===\n");
+    if (build_index_from_mmap(map, fsize, lines, &line_count) != 0){
+        fprintf(stderr,"Не удалось построить индекс.\n");
+        if (map) munmap((void*)map, fsize);
+        close(fd);
+        return 1;
+    }
+
+    printf("\nВсего строк в файле: %d\n", line_count);
+    if (line_count == 0){                    // пустой файл — корректный выход
+        puts("Файл пуст — выход.");
+        if (map) munmap((void*)map, fsize);
         close(fd);
         return 0;
     }
 
-    void *addr = mmap(NULL, g_size, PROT_READ, MAP_SHARED, fd, 0); // ADDED
-    if (addr == MAP_FAILED){
-        perror("mmap");
+    // Готовим обработчик SIGALRM: без SA_RESTART, чтобы fgets прерывался таймером
+    struct sigaction sa;
+    sa.sa_handler = alarm_handler;           // наш простой обработчик — только флаг
+    sigemptyset(&sa.sa_mask);                // не блокируем доп. сигналы
+    sa.sa_flags = 0;                         // без автоматического рестарта syscalls
+    if (sigaction(SIGALRM, &sa, NULL) == -1){
+        perror("sigaction");
+        if (map) munmap((void*)map, fsize);
         close(fd);
-        exit(1);
-    }
-    g_base = (const char *)addr;
-
-    // Шаг 1: Построение таблицы смещений и длин строк
-    printf("\n===ПОСТРОЕНИЕ ТАБЛИЦЫ СТРОК===\n");
-
-    /* REMOVED: побайтное чтение через read + вычисление offset через lseek
-    lines[0].offset = 0; 
-    current_offset = lseek(fd, 0L, SEEK_CUR);
-    while (read(fd, &ch, 1) > 0){
-        line_length++; 
-        if (ch == '\n'){
-            lines[line_count].length = line_length - 1;
-            printf("Строка %d: смещение = %ld, длина = %d\n", 
-                line_count + 1, lines[line_count].offset, lines[line_count].length);
-            line_count++;
-            current_offset = lseek(fd, 0L, SEEK_CUR);
-            if (line_count < MAX_LINES){
-                lines[line_count].offset = current_offset;
-            }
-            line_length = 0;
-        }
-    }
-    if (line_length > 0 && line_count < MAX_LINES){
-        lines[line_count].length = line_length;
-        printf("Строка %d: смещение = %ld, длина = %d\n",
-            line_count + 1, lines[line_count].offset, lines[line_count].length);
-        line_count++;
-    } 
-    */
-
-    /* ADDED: индекс строим по содержимому mmap — без read/lseek */
-    g_line_count = build_index_from_mmap(g_base, g_size, g_lines, MAX_LINES);
-    
-    printf("\nВсего строк в файле: %d\n", g_line_count);
-    
-    // Интерактивный запрос строк с ограничением времени
-    printf("\n===Интерактивный режим===\n");
-    printf("У вас есть %d секунд чтобы ввести номер строки\n", TIMEOUT);
-    printf("Введите номер строки (1-%d) или 0 для выхода:\n", g_line_count);
-
-    // Устанавливаем обработчик сигнала ALARM
-    signal(SIGALRM, alarm_handler);
-    alarm(TIMEOUT);
-
-    while(1){
-        timeout_occurred = 0;
-        printf("> ");
-        fflush(stdout); // важно для вывода промпта
-        
-        if (scanf("%d", &line_number) != 1) {
-            if (timeout_occurred) {
-                /* REMOVED: print_entire_file(); */
-                /* ADDED: читаем из mmap */
-                print_entire_file_mmap();
-                break;
-            }
-            // Очищаем буфер ввода в случае ошибки
-            int c;
-            while ((c = getchar()) != '\n' && c != EOF);
-            printf("Ошибка ввода. Введите число.\n");
-            alarm(0); // сбрасываем будильник
-            continue;
-        }
-        
-        // Сбрасываем будильник после успешного ввода
-        alarm(0);
-
-        if (timeout_occurred) {
-            /* REMOVED: print_entire_file(); */
-            /* ADDED: версия через mmap */
-            print_entire_file_mmap();
-            break;
-        }
-
-        // выход из программы 
-        if (line_number == 0){
-            printf("Выход из программы\n");
-            break;
-        }
-
-        // проверка корректности номера строки
-        if (line_number < 1 || line_number > g_line_count){
-            printf("Ошибка - номер строки должен быть от 1 до %d\n", g_line_count);
-            continue;
-        }
-
-        // получаем информацию о запрошенной строке
-        int  index  = line_number - 1; // индексация с 0
-        off_t offset = g_lines[index].offset;  // ADDED: off_t
-        int   length = g_lines[index].length;
-
-        printf("Строка %d: смещение = %lld, длина = %d\n",
-               line_number, (long long)offset, length);
-        printf("Содержимое: ");
-
-        /* REMOVED: позиционирование и чтение через lseek/read
-        if (lseek(fd, offset, SEEK_SET) == -1) {
-            perror("ошибка позиционирования");
-            continue;
-        }
-        char buffer[MAX_LINE_LENGTH + 1];
-        int bytes_read = read(fd, buffer, length);
-        if (bytes_read > 0){
-            buffer[bytes_read] = '\0';
-            printf("'%s'\n", buffer);
-        } else {
-            printf("Ошибка чтения строки\n");
-        }
-        */
-
-        /* ADDED: печать прямо из отображения — без копирования и без \0
-           Заодно — защита на слишком длинные строки (чтобы не засорить терминал). */
-        int to_print = length;
-        if (to_print > MAX_LINE_LENGTH) {
-            printf("[показано первые %d символов] '", MAX_LINE_LENGTH);
-            printf("%.*s", MAX_LINE_LENGTH, g_base + offset);
-            printf("'\n(полная длина строки = %d)\n", length);
-        } else {
-            printf("'%.*s'\n", to_print, g_base + offset);
-        }
-
-        // перезапускаем таймер на следующий ввод
-        alarm(TIMEOUT);
+        return 1;
     }
 
-    /* ADDED: освобождаем отображение */
-    if (g_base) munmap((void*)g_base, g_size);
-    close(fd);
-    return 0; 
+    // ---- ПЕРВЫЙ ВВОД (с таймером) ---------------------------------
+    printf("\n=== Интерактивный режим ===\n");
+    printf("У вас есть %d секунд, чтобы ввести номер строки (первый ввод).\n", TIMEOUT);
+    printf("Введите номер строки (1-%d) или 0 для выхода:\n> ", line_count);
+    fflush(stdout);
+
+    long ln;                                 // сюда пишем номер строки
+    for(;;){
+        int rc = read_int_with_timeout(0, line_count, &ln);
+        if (rc == -2 || timeout_occurred){   // истёк таймер: печатаем весь файл и выходим
+            print_entire_file();
+            if (map) munmap((void*)map, fsize);
+            close(fd);
+            return 0;
+        } else if (rc == 0){                 // EOF (Ctrl+D/закрыт stdin)
+            puts("\nВыход (EOF)");
+            if (map) munmap((void*)map, fsize);
+            close(fd);
+            return 0;
+        } else if (rc < 0){                  // некорректный ввод — предложим снова
+            printf("> "); fflush(stdout);
+            continue;
+        }
+        break;                               // получено валидное число
+    }
+    if (ln == 0){                            // пользователь выбрал выход
+        puts("Выход из программы");
+        if (map) munmap((void*)map, fsize);
+        close(fd);
+        return 0;
+    }
+
+    // ---- ДАЛЕЕ БЕЗ ТАЙМЕРА: пользователь может выбирать строки бесконечно ----
+    for (;;){
+        int index = (int)ln - 1;             // переводим 1..N → 0..N-1
+        long offset = lines[index].offset;   // смещение нужной строки
+        int  length = lines[index].length;   // длина строки без '\n'
+
+        printf("\nСтрока %ld: смещение = %ld, длина = %d\n", ln, offset, length);
+        printf("Содержимое: '");
+
+        // Печатаем сразу из отображения; ограничиваемся MAX_LINE_LENGTH для демонстрации
+        int to_print = (length < MAX_LINE_LENGTH) ? length : MAX_LINE_LENGTH;
+        if (to_print > 0 && (size_t)offset + (size_t)to_print <= g_size){
+            (void)fwrite(g_map + offset, 1, (size_t)to_print, stdout);
+        }
+        printf("%s'\n", (length > to_print) ? " ...[обрезано]" : "");
+
+        // Следующий выбор — без таймера
+        printf("\nВведите номер строки (1-%d) или 0 для выхода:\n> ", line_count);
+        fflush(stdout);
+
+        int rc2 = read_int_safe(0, line_count, &ln);
+        if (rc2 == 0){ puts("\nВыход (EOF)"); break; }     // stdin закрыт
+        if (rc2 < 0){ continue; }                          // мусор — спрашиваем снова
+        if (ln == 0){ puts("Выход из программы"); break; } // явный выход
+    }
+
+    if (map) munmap((void*)map, fsize);      // снимаем отображение (возврат страниц ядру)
+    close(fd);                               // закрываем файл (уменьшаем refcount в ядре)
+    return 0;                                // нормальный выход
 }
