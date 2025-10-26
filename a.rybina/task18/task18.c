@@ -64,7 +64,7 @@ int main(int argc, char* argv[]) {
         printf("%c", (file_stat.st_mode & S_IXOTH) ? 'x' : '-');
 
         // Number of links
-        printf(" %2lu", file_stat.st_nlink);
+        printf(" %2u", file_stat.st_nlink);
 
         // Get owner and group information
         struct passwd* owner_info = getpwuid(file_stat.st_uid);
