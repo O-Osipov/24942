@@ -7,12 +7,7 @@
 #include <string.h>
 #include <errno.h>
 #include <limits.h>
-#include <getopt.h>
-#include <linux/limits.h>
 
-/*
- * Функция для печати идентификаторов пользователя и группы
- */
 void print_user_group_ids() {
     printf("=== User and Group IDs ===\n");
     printf("Real User ID (RUID): %d\n", getuid());
@@ -21,9 +16,6 @@ void print_user_group_ids() {
     printf("Effective Group ID (EGID): %d\n", getegid());
 }
 
-/*
- * Функция делает процесс лидером новой группы процессов
- */
 void become_process_group_leader() {
     printf("=== Process Group Leadership ===\n");
     if (setpgid(0, 0) == 0) {
@@ -33,9 +25,6 @@ void become_process_group_leader() {
     }
 }
 
-/*
- * Печатает основные идентификаторы процесса
- */
 void print_process_ids() {
     printf("=== Process Identification ===\n");
     printf("Process ID (PID): %d\n", getpid());
@@ -43,15 +32,28 @@ void print_process_ids() {
     printf("Process Group ID (PGID): %d\n", getpgrp());
 }
 
-/*
- * Получает и печатает текущее значение ulimit для размера файлов
- */
-void print_ulimit() {
-    printf("=== File Size Limit (ulimit) ===\n");
+void print_process_limit() {
+    printf("=== Process Limit (ulimit -u) ===\n");
+    struct rlimit rlim;
+    
+    if (getrlimit(RLIMIT_NPROC, &rlim) == 0) {
+        printf("Максимальное количество процессов: ");
+        if (rlim.rlim_cur == RLIM_INFINITY) {
+            printf("неограничен\n");
+        } else {
+            printf("%ld\n", (long)rlim.rlim_cur);
+        }
+    } else {
+        perror("Ошибка при получении лимита процессов");
+    }
+}
+
+void print_file_size_limit() {
+    printf("=== File Size Limit (ulimit -f) ===\n");
     struct rlimit rlim;
     
     if (getrlimit(RLIMIT_FSIZE, &rlim) == 0) {
-        printf("Текущий ulimit (макс. размер файла): ");
+        printf("Максимальный размер файла: ");
         if (rlim.rlim_cur == RLIM_INFINITY) {
             printf("неограничен\n");
         } else {
@@ -62,11 +64,40 @@ void print_ulimit() {
     }
 }
 
-/*
- * Устанавливает новое значение ulimit
- */
-int set_new_ulimit(const char *value) {
-    printf("=== Setting New Ulimit ===\n");
+void print_data_size_limit() {
+    printf("=== Data Size Limit (ulimit -d) ===\n");
+    struct rlimit rlim;
+    
+    if (getrlimit(RLIMIT_DATA, &rlim) == 0) {
+        printf("Максимальный размер сегмента данных: ");
+        if (rlim.rlim_cur == RLIM_INFINITY) {
+            printf("неограничен\n");
+        } else {
+            printf("%ld байт\n", (long)rlim.rlim_cur);
+        }
+    } else {
+        perror("Ошибка при получении лимита данных");
+    }
+}
+
+void print_stack_size_limit() {
+    printf("=== Stack Size Limit (ulimit -s) ===\n");
+    struct rlimit rlim;
+    
+    if (getrlimit(RLIMIT_STACK, &rlim) == 0) {
+        printf("Максимальный размер стека: ");
+        if (rlim.rlim_cur == RLIM_INFINITY) {
+            printf("неограничен\n");
+        } else {
+            printf("%ld байт\n", (long)rlim.rlim_cur);
+        }
+    } else {
+        perror("Ошибка при получении лимита стека");
+    }
+}
+
+int set_file_size_limit(const char *value) {
+    printf("=== Setting File Size Limit ===\n");
     struct rlimit rlim;
     long new_limit;
     char *endptr;
@@ -91,19 +122,55 @@ int set_new_ulimit(const char *value) {
         return -1;
     }
     
-    rlim.rlim_cur = (new_limit < rlim.rlim_max) ? new_limit : rlim.rlim_max;
-    
+    rlim.rlim_cur = (rlim_t)new_limit;
     if (setrlimit(RLIMIT_FSIZE, &rlim) != 0) {
         perror("Ошибка при установке ulimit");
         return -1;
     }
     
-    printf("Ulimit успешно установлен: %ld байт\n", new_limit);
+    printf("Лимит размера файла установлен: %ld байт\n", new_limit);
+    return 0;
+}
+
+
+int set_process_limit(const char *value) {
+    printf("=== Setting Process Limit ===\n");
+    struct rlimit rlim;
+    long new_limit;
+    char *endptr;
+    
+    new_limit = strtol(value, &endptr, 10);
+    
+    if (endptr == value) {
+        fprintf(stderr, "Ошибка: '%s' не является числом\n", value);
+        return -1;
+    }
+    if (*endptr != '\0') {
+        fprintf(stderr, "Ошибка: нечисловые символы в '%s'\n", value);
+        return -1;
+    }
+    if (new_limit < 0) {
+        fprintf(stderr, "Ошибка: лимит процессов не может быть отрицательным\n");
+        return -1;
+    }
+    
+    if (getrlimit(RLIMIT_NPROC, &rlim) != 0) {
+        perror("Ошибка при получении текущего лимита процессов");
+        return -1;
+    }
+    
+    rlim.rlim_cur = (rlim_t)new_limit;
+    if (setrlimit(RLIMIT_NPROC, &rlim) != 0) {
+        perror("Ошибка при установке лимита процессов");
+        return -1;
+    }
+    
+    printf("Лимит процессов установлен: %ld\n", new_limit);
     return 0;
 }
 
 void print_core_size() {
-    printf("=== Core File Size Limit ===\n");
+    printf("=== Core File Size Limit (ulimit -c) ===\n");
     struct rlimit rlim;
     
     if (getrlimit(RLIMIT_CORE, &rlim) == 0) {
@@ -118,9 +185,6 @@ void print_core_size() {
     }
 }
 
-/*
- * Устанавливает новый размер для core-файлов
- */
 int set_core_size(const char *value) {
     printf("=== Setting Core File Size ===\n");
     struct rlimit rlim;
@@ -129,8 +193,16 @@ int set_core_size(const char *value) {
     
     new_size = strtol(value, &endptr, 10);
     
-    if (endptr == value || *endptr != '\0' || new_size < 0) {
-        fprintf(stderr, "Ошибка: неверный размер core-файла '%s'\n", value);
+    if (endptr == value) {
+        fprintf(stderr, "Ошибка: '%s' не является числом\n", value);
+        return -1;
+    }
+    if (*endptr != '\0') {
+        fprintf(stderr, "Ошибка: нечисловые символы в '%s'\n", value);
+        return -1;
+    }
+    if (new_size < 0) {
+        fprintf(stderr, "Ошибка: размер core-файла не может быть отрицательным\n");
         return -1;
     }
     
@@ -139,8 +211,7 @@ int set_core_size(const char *value) {
         return -1;
     }
     
-    rlim.rlim_cur = (new_size < rlim.rlim_max) ? new_size : rlim.rlim_max;
-    
+    rlim.rlim_cur = (rlim_t)new_size;
     if (setrlimit(RLIMIT_CORE, &rlim) != 0) {
         perror("Ошибка при установке размера core-файла");
         return -1;
@@ -161,7 +232,6 @@ void print_current_directory() {
     }
 }
 
-
 void print_environment() {
     printf("=== Environment Variables ===\n");
     extern char **environ;
@@ -174,33 +244,40 @@ void print_environment() {
     char **env = environ;
     int count = 0;
     
-    while (*env != NULL) {
+    while (*env != NULL && count < 10) {
         printf("%d: %s\n", ++count, *env);
         env++;
     }
+    if (*env != NULL) {
+        printf("... (и еще переменных)\n");
+    }
 }
 
-/*
- * Устанавливает новую переменную окружения или изменяет существующую
- */
 int set_environment_variable(const char *name_value) {
     printf("=== Setting Environment Variable ===\n");
-    char *name = strdup(name_value);
+    
+    if (name_value == NULL || strlen(name_value) == 0) {
+        fprintf(stderr, "Ошибка: пустая строка для переменной окружения\n");
+        return -1;
+    }
+    
+    char *equals = strchr(name_value, '=');
+    if (equals == NULL || equals == name_value) {
+        fprintf(stderr, "Ошибка: формат должен быть 'name=value', получено: '%s'\n", 
+                name_value ? name_value : "NULL");
+        return -1;
+    }
+    
+    size_t name_len = equals - name_value;
+    char *name = malloc(name_len + 1);
     if (name == NULL) {
         perror("Ошибка выделения памяти");
         return -1;
     }
     
-    char *value = strchr(name, '=');
-    
-    if (value == NULL) {
-        fprintf(stderr, "Ошибка: формат должен быть 'name=value', получено: '%s'\n", name_value);
-        free(name);
-        return -1;
-    }
-    
-    *value = '\0';
-    value++;
+    strncpy(name, name_value, name_len);
+    name[name_len] = '\0';
+    char *value = equals + 1;
     
     if (setenv(name, value, 1) != 0) {
         perror("Ошибка при установке переменной окружения");
@@ -213,11 +290,50 @@ int set_environment_variable(const char *name_value) {
     return 0;
 }
 
-
 typedef struct {
-    int opt;
-    char *arg;
-} option_t;
+    char option;
+    char *argument;
+} command_option_t;
+
+int parse_options_right_to_left(int argc, char *argv[], command_option_t **options) {
+    *options = malloc(argc * sizeof(command_option_t));
+    if (*options == NULL) {
+        perror("Ошибка выделения памяти");
+        return -1;
+    }
+    
+    int count = 0;
+    
+    for (int i = argc - 1; i >= 1; i--) {
+        if (argv[i][0] != '-' || strlen(argv[i]) != 2) {
+            continue;
+        }
+        
+        char opt = argv[i][1];
+        
+        if (strchr("ispucdvf", opt) != NULL) {
+            (*options)[count].option = opt;
+            (*options)[count].argument = NULL;
+            count++;
+        }
+        else if (opt == 'U' || opt == 'C' || opt == 'V' || opt == 'P' || opt == 'F' || opt == 'D' || opt == 'S') {
+            if (i + 1 >= argc || argv[i + 1][0] == '-') {
+                fprintf(stderr, "Ошибка: опция -%c требует аргумент\n", opt);
+                continue;
+            }
+            
+            (*options)[count].option = opt;
+            (*options)[count].argument = argv[i + 1];
+            count++;
+            i--;
+        }
+        else {
+            fprintf(stderr, "Предупреждение: неизвестная опция -%c\n", opt);
+        }
+    }
+    
+    return count;
+}
 
 int main(int argc, char *argv[]) {
     printf("=== Process Information Tool ===\n");
@@ -228,52 +344,32 @@ int main(int argc, char *argv[]) {
         printf("  -i      Показать ID пользователя и группы\n");
         printf("  -s      Стать лидером группы процессов\n");
         printf("  -p      Показать ID процесса\n");
-        printf("  -u      Показать ulimit\n");
-        printf("  -U size Установить ulimit\n");
-        printf("  -c      Показать размер core-файла\n");
-        printf("  -C size Установить размер core-файла\n");
-        printf("  -d      Показать текущую директорию\n");
+        printf("  -u      Показать лимит процессов (ulimit -u)\n");
+        printf("  -f      Показать лимит размера файлов (ulimit -f)\n");
+        printf("  -d      Показать лимит данных (ulimit -d)\n");
+        printf("  -c      Показать размер core-файла (ulimit -c)\n");
         printf("  -v      Показать переменные окружения\n");
+        printf("  -U size Установить лимит процессов\n");
+        printf("  -F size Установить лимит размера файлов\n");
+        printf("  -D size Установить лимит данных\n");
+        printf("  -C size Установить размер core-файла\n");
+        printf("  -S size Установить лимит стека\n");
         printf("  -V var=value Установить переменную окружения\n");
         return 0;
     }
 
-    // Массив для хранения опций в порядке выполнения (справа налево)
-    option_t *options = malloc(argc * sizeof(option_t));
-    int option_count = 0;
+    command_option_t *options = NULL;
+    int option_count = parse_options_right_to_left(argc, argv, &options);
     
-    printf("Обработка опций справа налево...\n\n");
-
-    // ПЕРВЫЙ ПРОХОД: собираем все опции с помощью getopt в обратном порядке
-    for (int start_pos = argc - 1; start_pos >= 1; start_pos--) {
-        // Если текущая позиция - это опция
-        if (argv[start_pos][0] == '-') {
-            // Временные переменные для работы getopt
-            int saved_optind = optind;
-            int saved_opterr = opterr;
-            
-            // Устанавливаем начальную позицию для getopt
-            optind = start_pos;
-            opterr = 0; // Отключаем стандартные сообщения об ошибках
-            
-            int opt;
-            while ((opt = getopt(argc, argv, "ispuU:cC:dvV:")) != -1) {
-                if (opt != '?') { // Игнорируем неизвестные опции на этом этапе
-                    options[option_count].opt = opt;
-                    options[option_count].arg = (optarg != NULL) ? strdup(optarg) : NULL;
-                    option_count++;
-                    break; // Обрабатываем только одну опцию за раз
-                }
-            }
-            
-            optind = saved_optind;
-            opterr = saved_opterr;
-        }
+    if (option_count < 0) {
+        fprintf(stderr, "Ошибка при разборе опций\n");
+        return 1;
     }
+    
+    printf("Обработка %d опций справа налево...\n\n", option_count);
 
-    // ВТОРОЙ ПРОХОД: выполняем опции в собранном порядке (справа налево)
     for (int i = 0; i < option_count; i++) {
-        switch (options[i].opt) {
+        switch (options[i].option) {
             case 'i':
                 print_user_group_ids();
                 break;
@@ -284,54 +380,75 @@ int main(int argc, char *argv[]) {
                 print_process_ids();
                 break;
             case 'u':
-                print_ulimit();
+                print_process_limit();
+                break;
+            case 'f':
+                print_file_size_limit();
+                break;
+            case 'd':
+                print_data_size_limit(); 
+                break;
+            case 'c':
+                print_core_size();     
                 break;
             case 'U':
-                if (options[i].arg != NULL) {
-                    set_new_ulimit(options[i].arg);
+                if (options[i].argument != NULL) {
+                    set_process_limit(options[i].argument);
                 } else {
                     fprintf(stderr, "Ошибка: опция -U требует значение\n");
                 }
                 break;
-            case 'c':
-                print_core_size();
+            case 'F':
+                if (options[i].argument != NULL) {
+                    set_file_size_limit(options[i].argument);
+                } else {
+                    fprintf(stderr, "Ошибка: опция -F требует значение\n");
+                }
+                break;
+            case 'D':
+                if (options[i].argument != NULL) {
+                    printf("Установка лимита данных: %s\n", options[i].argument);
+                } else {
+                    fprintf(stderr, "Ошибка: опция -D требует значение\n");
+                }
                 break;
             case 'C':
-                if (options[i].arg != NULL) {
-                    set_core_size(options[i].arg);
+                if (options[i].argument != NULL) {
+                    set_core_size(options[i].argument);
                 } else {
                     fprintf(stderr, "Ошибка: опция -C требует значение\n");
                 }
                 break;
-            case 'd':
-                print_current_directory();
+            case 'S':
+                if (options[i].argument != NULL) {
+
+                    printf("Установка лимита стека: %s\n", options[i].argument);
+                } else {
+                    fprintf(stderr, "Ошибка: опция -S требует значение\n");
+                }
                 break;
             case 'v':
                 print_environment();
                 break;
             case 'V':
-                if (options[i].arg != NULL) {
-                    set_environment_variable(options[i].arg);
+                if (options[i].argument != NULL) {
+                    set_environment_variable(options[i].argument);
                 } else {
                     fprintf(stderr, "Ошибка: опция -V требует значение\n");
                 }
                 break;
-            case '?':
+            default:
+                fprintf(stderr, "Неизвестная опция: -%c\n", options[i].option);
                 break;
         }
         printf("\n");
-
-        if (options[i].arg != NULL) {
-            free(options[i].arg);
-        }
     }
 
     free(options);
     return 0;
 }
 
-
-/*
-chmod +x test_process_info.sh
-./test_process_info.sh 
+/* 
+gcc -o process_info process_info.c
+./process_info -u
 */

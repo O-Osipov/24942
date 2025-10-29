@@ -6,6 +6,7 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <signal.h>
+#include <sys/select.h>
 
 #define MAX_LINES 1000
 #define BUFFER_SIZE 1024
@@ -25,7 +26,7 @@ void alarm_handler(int sig) {
 }
 
 void print_entire_file(int fd, struct LineInfo *lines, int line_count) {
-    printf("\n ВРЕМЯ ВЫШЛО! Вывод всего файла:\n");
+    printf("\nВРЕМЯ ВЫШЛО! Вывод всего файла:\n");
     printf("========================================\n");
     
     char line_buffer[BUFFER_SIZE];
@@ -100,65 +101,102 @@ int main(int argc, char *argv[]) {
     
     signal(SIGALRM, alarm_handler);
     
-    printf("\n У вас 5 секунд чтобы ввести номер строки!\n");
+    printf("\nУ вас 5 секунд чтобы ввести номер строки!\n");
     printf("Введите номер строки (1-%d), 0 для выхода:\n", line_count);
     
     int line_number;
-    char line_buffer[BUFFER_SIZE];
+    char input_buffer[BUFFER_SIZE];
+    int timeout_active = 1;
     
+
     alarm(5);
     
     while (1) {
         printf("Введите номер строки: ");
         fflush(stdout);
         
-        if (scanf("%d", &line_number) != 1) {
-            if (timeout_occurred) {
-                print_entire_file(fd, lines, line_count);
-                break;
-            }
-            printf("Ошибка ввода.\n");
-            while (getchar() != '\n');
-            continue;
-        }
 
-        alarm(0);
-        
         if (timeout_occurred) {
+            printf("\n");
             print_entire_file(fd, lines, line_count);
             break;
         }
         
-        if (line_number == 0) {
-            printf("Завершение работы.\n");
+        fd_set readfds;
+        struct timeval tv;
+        
+        FD_ZERO(&readfds);
+        FD_SET(STDIN_FILENO, &readfds);
+        
+        if (timeout_active) {
+            tv.tv_sec = 5;
+            tv.tv_usec = 0;
+        } else {
+            tv.tv_sec = 0;
+            tv.tv_usec = 0;
+        }
+        
+        int ready = select(STDIN_FILENO + 1, &readfds, NULL, NULL, 
+                          timeout_active ? &tv : NULL);
+        
+        if (timeout_occurred) {
+            printf("\n");
+            print_entire_file(fd, lines, line_count);
             break;
         }
         
-        if (line_number < 1 || line_number > line_count) {
-            printf("Ошибка: номер строки должен быть от 1 до %d\n", line_count);
-            alarm(5);
-            continue;
+        if (ready == 0 && timeout_active) {
+            printf("\n");
+            print_entire_file(fd, lines, line_count);
+            break;
         }
-        
-        int index = line_number - 1;
-        
-        if (lseek(fd, lines[index].offset, SEEK_SET) == (off_t)-1) {
-            perror("Ошибка позиционирования");
-            alarm(5);
-            continue;
+        else if (ready > 0) {
+
+            if (fgets(input_buffer, sizeof(input_buffer), stdin) != NULL) {
+
+                if (timeout_active) {
+                    alarm(0);
+                    timeout_active = 0;
+                    timeout_occurred = 0;
+                }
+                
+                input_buffer[strcspn(input_buffer, "\n")] = 0;
+                
+                if (sscanf(input_buffer, "%d", &line_number) != 1) {
+                    printf("Ошибка ввода. Введите число.\n");
+                    continue;
+                }
+                
+                if (line_number == 0) {
+                    printf("Завершение работы.\n");
+                    break;
+                }
+                
+                if (line_number < 1 || line_number > line_count) {
+                    printf("Ошибка: номер строки должен быть от 1 до %d\n", line_count);
+                    continue;
+                }
+                
+                int index = line_number - 1;
+                
+                if (lseek(fd, lines[index].offset, SEEK_SET) == (off_t)-1) {
+                    perror("Ошибка позиционирования");
+                    continue;
+                }
+                
+                ssize_t read_bytes = read(fd, input_buffer, lines[index].length);
+                if (read_bytes == -1) {
+                    perror("Ошибка чтения строки");
+                    continue;
+                }
+                
+                input_buffer[read_bytes] = '\0';
+                printf("Строка %d: %s\n", line_number, input_buffer);
+            }
+        } else if (ready == -1) {
+            perror("Ошибка select");
+            break;
         }
-        
-        ssize_t read_bytes = read(fd, line_buffer, lines[index].length);
-        if (read_bytes == -1) {
-            perror("Ошибка чтения строки");
-            alarm(5);
-            continue;
-        }
-        
-        line_buffer[read_bytes] = '\0';
-        printf("Строка %d: %s\n", line_number, line_buffer);
-        
-        alarm(5);
     }
     
     close(fd);
