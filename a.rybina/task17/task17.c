@@ -52,10 +52,15 @@ void enableRawMode() {
 int main() {
     enableRawMode();
 
+    printf("Terminal line editor started.\n");
+    printf("Controls: Backspace (erase char), Ctrl+U (kill line), Ctrl+W (kill word), Enter (new line), Ctrl+D (exit if line empty)\n");
+    printf("Line length limit: %d characters. Enter text:\n", LINE_LENGTH);
+    fflush(stdout);
+
     char c;
     static char line[LINE_LENGTH + 1];
     int len = 0;  // Track current line length
-
+    
     while (read(STDIN_FILENO, &c, 1) == 1) {
         if (iscntrl(c) || !isprint(c)) { // Control key or is printable
             switch (c) {

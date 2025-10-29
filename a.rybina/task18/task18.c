@@ -23,7 +23,7 @@
 int main(int argc, char* argv[]) {
     // Check number of arguments
     if (argc < 2) {
-        fprintf(stderr, "Usage: %s <filename> [filename ...]\n", argv[0]);
+        fprintf(stderr, "Usage: %s <filename> [filename ...]\n to get file information", argv[0]);
         return 1;
     }
 
