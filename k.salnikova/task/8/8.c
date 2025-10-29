@@ -24,14 +24,12 @@ int main(int argc, char *argv[]) {
     printf("Режим блокировки: %s\n", mandatory ? "ОБЯЗАТЕЛЬНАЯ" : "ДОПУСТИМАЯ");
     printf("PID: %d\n", getpid());
 
-    // 1. Открываем файл
     int fd = open(filename, O_RDWR | O_CREAT, 0666);
     if (fd == -1) {
         perror("Ошибка открытия файла");
         exit(1);
     }
 
-    // 2. Устанавливаем права для mandatory locking
     if (mandatory) {
         if (fchmod(fd, (S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP) | S_ISGID) == -1) {
             perror("Ошибка установки mandatory режима");
@@ -39,7 +37,6 @@ int main(int argc, char *argv[]) {
         printf("Установлен S_ISGID бит для обязательной блокировки\n");
     }
 
-    // 3. Устанавливаем блокировку на весь файл
     struct flock lock;
     lock.l_type = F_WRLCK;
     lock.l_whence = SEEK_SET;
@@ -52,17 +49,17 @@ int main(int argc, char *argv[]) {
         printf("Не удалось установить блокировку: файл уже заблокирован\n");
         
         if (mandatory) {
-            printf("❌ ОБЯЗАТЕЛЬНАЯ БЛОКИРОВКА: Редактор не будет запущен!\n");
+            printf(" ОБЯЗАТЕЛЬНАЯ БЛОКИРОВКА: Редактор не будет запущен!\n");
             close(fd);
             exit(0);
         } else {
-            printf("⚠ ДОПУСТИМАЯ БЛОКИРОВКА: Блокировка не установлена, но редактор запустится\n");
+            printf(" ДОПУСТИМАЯ БЛОКИРОВКА: Блокировка не установлена, но редактор запустится\n");
         }
     } else {
-        printf("✓ Блокировка успешно установлена\n");
+        printf(" Блокировка успешно установлена\n");
     }
 
-    // 4. Запускаем редактор
+
     printf("Запуск редактора '%s'...\n", EDITOR);
     printf("=== ФАЙЛ ЗАБЛОКИРОВАН ===\n");
     
@@ -74,7 +71,6 @@ int main(int argc, char *argv[]) {
         perror("Ошибка запуска редактора");
     }
 
-    // 5. Закрываем файл (блокировка снимается)
     close(fd);
     printf("Блокировка снята. Завершение работы.\n");
     
