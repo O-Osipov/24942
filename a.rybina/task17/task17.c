@@ -41,6 +41,11 @@ void enableRawMode() {
 
     struct termios raw = orig_termios;
     raw.c_lflag &= ~(ECHO | ICANON);
+    
+    // Set VMIN and VTIME for 1-byte buffering
+    raw.c_cc[VMIN] = 1;   // Read at least 1 character
+    raw.c_cc[VTIME] = 0;  // No timeout
+    
     tcsetattr(STDIN_FILENO, TCSAFLUSH, &raw);
 }
 

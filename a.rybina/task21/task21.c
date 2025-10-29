@@ -5,15 +5,24 @@
 #include <stdlib.h>
 #include <unistd.h>
 
+// For Windows compatibility
+#ifndef SIGQUIT
+#define SIGQUIT SIGTERM
+#endif
+
 int count = 0;
 
-void handleSIGINT() {
-    printf("\a");
+void handleSIGINT(int sig) {
+    printf("\a");  // Make sound
     fflush(stdout);
     count++;
+    printf(" [Sound #%d] ", count);  // Debug output
+    fflush(stdout);
+    // Re-register the signal handler (some systems reset it after first call)
+    signal(SIGINT, handleSIGINT);
 }
 
-void handleSIGQUIT() {
+void handleSIGQUIT(int sig) {
     printf("\nThe signal sounded %d times.\n", count);
     exit(0);
 }
