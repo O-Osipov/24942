@@ -1,20 +1,18 @@
 #include <sys/types.h>
 #include <stdio.h>
 #include <unistd.h>
-#include <wait.h>
+#include <sys/wait.h>
 #include <fcntl.h>
 #include <stdlib.h>
 #include <signal.h>
 #include <errno.h>
 #include <string.h>
-#include <unistd.h>
 #include "shell.h"
 
 char *infile, *outfile, *appfile;
 struct command cmds[MAXCMDS];
 char bkgrnd;
 
-// Функция для обработки встроенных команд
 int handle_builtin(struct command *cmd) {
     if (strcmp(cmd->cmdargs[0], "cd") == 0) {
         char *path = cmd->cmdargs[1];
@@ -34,153 +32,105 @@ int handle_builtin(struct command *cmd) {
     else if (strcmp(cmd->cmdargs[0], "exit") == 0) {
         exit(0);
     }
-    return -1; // Не встроенная команда
+    else if (strcmp(cmd->cmdargs[0], "echo") == 0) {
+        for (int i = 1; cmd->cmdargs[i] != NULL; i++) {
+            printf("%s", cmd->cmdargs[i]);
+            if (cmd->cmdargs[i + 1] != NULL) {
+                printf(" ");
+            }
+        }
+        printf("\n");
+        return 0;
+    }
+    return -1;
 }
 
-main(int argc, char *argv[])
+int main(int argc, char *argv[])
 {
-    register int i;
     char line[1024];
-    int ncmds;
     char prompt[50];
-    pid_t pid;
     int status;
-    int fd_in, fd_out;
-    int pipefd[2];
-    int in_fd = 0;
 
     sprintf(prompt,"[%s] ", argv[0]);
 
     while (promptline(prompt, line, sizeof(line)) > 0) {
-        if ((ncmds = parseline(line)) <= 0)
+        int ncmds = parseline(line);
+        
+        if (ncmds <= 0) {
             continue;
+        }
 
-        in_fd = 0;
-
-        // Сохраняем значения перенаправлений перед использованием
-        char *saved_infile = infile;
-        char *saved_outfile = outfile;
-        char *saved_appfile = appfile;
-        char saved_bkgrnd = bkgrnd;
-
-        // Handle input redirection for the entire command chain
-        if (infile != NULL) {
-            in_fd = open(infile, O_RDONLY);
-            if (in_fd < 0) {
-                perror("open input file");
-                infile = NULL;
+        for (int i = 0; i < ncmds; i++) {
+            if (cmds[i].cmdargs[0] == NULL) {
                 continue;
             }
-        }
 
-        // Если только одна команда и она встроенная - выполняем без fork
-        if (ncmds == 1 && handle_builtin(&cmds[0]) != -1) {
-            if (in_fd > 0) close(in_fd);
-            // Сбрасываем перенаправления после выполнения команды
-            infile = outfile = appfile = NULL;
-            bkgrnd = 0;
-            continue;
-        }
-
-        for (i = 0; i < ncmds; i++) {
-            // Пропускаем встроенные команды в пайпах
-            if (ncmds > 1 && handle_builtin(&cmds[i]) != -1) {
-                fprintf(stderr, "Builtin commands don't work in pipes: %s\n", cmds[i].cmdargs[0]);
-                break;
+            // Встроенные команды выполняем без fork
+            if (handle_builtin(&cmds[i]) != -1) {
+                continue;
             }
 
-            // Create pipe for all commands except the last one
-            if (i < ncmds - 1) {
-                if (pipe(pipefd) < 0) {
-                    perror("pipe failed");
-                    if (in_fd > 0) close(in_fd);
-                    continue;
-                }
-            }
-
-            pid = fork();
+            pid_t pid = fork();
             
-            if (pid == 0) {  /* child process */
-                // Set up input
-                if (in_fd != 0) {
-                    dup2(in_fd, 0);
-                    close(in_fd);
+            if (pid == 0) {
+                // ПЕРЕНАПРАВЛЕНИЕ ВВОДА для первой команды
+                if (i == 0 && infile != NULL) {
+                    int fd_in = open(infile, O_RDONLY);
+                    if (fd_in < 0) {
+                        perror("open input file");
+                        exit(1);
+                    }
+                    dup2(fd_in, STDIN_FILENO);
+                    close(fd_in);
                 }
 
-                // Set up output
-                if (i < ncmds - 1) {
-                    close(pipefd[0]);
-                    dup2(pipefd[1], 1);
-                    close(pipefd[1]);
-                } else {
-                    // Для последней команды используем сохраненные значения
-                    if (saved_outfile != NULL) {
-                        fd_out = open(saved_outfile, O_WRONLY | O_CREAT | O_TRUNC, 0644);
+                // ПЕРЕНАПРАВЛЕНИЕ ВЫВОДА для последней команды
+                if (i == ncmds - 1) {
+                    if (outfile != NULL) {
+                        int fd_out = open(outfile, O_WRONLY | O_CREAT | O_TRUNC, 0644);
                         if (fd_out < 0) {
                             perror("open output file");
                             exit(1);
                         }
-                        dup2(fd_out, 1);
+                        dup2(fd_out, STDOUT_FILENO);
                         close(fd_out);
-                    } else if (saved_appfile != NULL) {
-                        fd_out = open(saved_appfile, O_WRONLY | O_CREAT | O_APPEND, 0644);
-                        if (fd_out < 0) {
+                    } else if (appfile != NULL) {
+                        int fd_app = open(appfile, O_WRONLY | O_CREAT | O_APPEND, 0644);
+                        if (fd_app < 0) {
                             perror("open append file");
                             exit(1);
                         }
-                        dup2(fd_out, 1);
-                        close(fd_out);
+                        dup2(fd_app, STDOUT_FILENO);
+                        close(fd_app);
                     }
                 }
 
-                // Close all other file descriptors
-                if (in_fd > 0) close(in_fd);
-                if (i < ncmds - 1) {
-                    close(pipefd[0]);
-                    close(pipefd[1]);
-                }
-
-                // Execute command
                 execvp(cmds[i].cmdargs[0], cmds[i].cmdargs);
                 perror("execvp failed");
                 exit(1);
             }
-            else if (pid < 0) {
-                perror("fork failed");
-                if (in_fd > 0) close(in_fd);
-                if (i < ncmds - 1) {
-                    close(pipefd[0]);
-                    close(pipefd[1]);
+            else if (pid > 0) {
+                if (!bkgrnd) {
+                    waitpid(pid, &status, 0);
+                } else {
+                    printf("Background process PID: %d\n", pid);
                 }
-                continue;
             }
-
-            // Parent process cleanup
-            if (in_fd != 0) {
-                close(in_fd);
-                in_fd = 0;
-            }
-
-            if (i < ncmds - 1) {
-                close(pipefd[1]);
-                in_fd = pipefd[0];
+            else {
+                perror("fork failed");
             }
         }
 
-        if (in_fd > 0) {
-            close(in_fd);
-        }
-
-        // Wait for all children in foreground
-        if (!saved_bkgrnd) {
-            for (i = 0; i < ncmds; i++) {
-                wait(&status);
-            }
-        }
-
-        // Reset for next command
+        // Сбрасываем глобальные переменные для следующей команды
         infile = outfile = appfile = NULL;
         bkgrnd = 0;
 
+        // Очищаем структуры команд
+        for (int i = 0; i < MAXCMDS; i++) {
+            for (int j = 0; j < MAXARGS; j++) {
+                cmds[i].cmdargs[j] = NULL;
+            }
+        }
     }
+    return 0;
 }
