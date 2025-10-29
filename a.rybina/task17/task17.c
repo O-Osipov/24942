@@ -98,6 +98,14 @@ int main() {
                 break;
             }
 
+            case '\n':
+            case '\r': { // Enter key
+                putchar('\n');
+                len = 0;
+                line[0] = '\0';
+                break;
+            }
+
             case CEOF: { // ctrl+D
                 if (len == 0) { 
                     exit(0); 
