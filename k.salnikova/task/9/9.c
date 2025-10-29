@@ -59,7 +59,7 @@ int main() {
         } else {
             printf("Информация о завершении дочернего процесса:\n");
             printf("  PID: %d\n", waited_pid);
-            
+             
             if (WIFEXITED(status)) {
                 printf("  Причина: завершился нормально\n");
                 printf("  Код возврата: %d\n", WEXITSTATUS(status));
