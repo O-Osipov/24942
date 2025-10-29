@@ -1,0 +1,7 @@
+{
+    "files.associations": {
+        "stat.h": "c",
+        "select.h": "c",
+        "limits.h": "c"
+    }
+}
