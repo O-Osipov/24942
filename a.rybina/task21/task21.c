@@ -13,6 +13,7 @@
 int count = 0;
 
 void handleSIGINT(int sig) {
+    (void)sig;  // Suppress unused parameter warning
     printf("\a");  // Make sound
     fflush(stdout);
     count++;
@@ -23,6 +24,7 @@ void handleSIGINT(int sig) {
 }
 
 void handleSIGQUIT(int sig) {
+    (void)sig;  // Suppress unused parameter warning
     printf("\nThe signal sounded %d times.\n", count);
     exit(0);
 }
