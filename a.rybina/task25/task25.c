@@ -34,6 +34,10 @@ static ssize_t robust_write(int fd, const void *buf, size_t count) {
 }
 
 int main(void) {
+    printf("Pipe program: Parent sends text, child converts to uppercase.\n");
+    printf("Type text (Ctrl+D to finish):\n");
+    fflush(stdout);
+    
     int pipe_fds[2];
     if (pipe(pipe_fds) == -1) {
         perror("pipe");
@@ -61,10 +65,18 @@ int main(void) {
                 perror("read");
                 _exit(1);
             }
+            size_t write_pos = 0;
             for (ssize_t i = 0; i < n; ++i) {
                 unsigned char ch = (unsigned char)buffer[i];
-                buffer[i] = (char)toupper(ch);
+                // Only process letters, numbers, and printable special characters
+                // Filter out control characters that might trigger commands
+                if (isalnum(ch) || isprint(ch)) {
+                    buffer[write_pos] = (char)(isalpha(ch) ? toupper(ch) : ch);
+                    write_pos++;
+                }
+                // Skip control characters and non-printable characters
             }
+            n = (ssize_t)write_pos;
             if (robust_write(STDOUT_FILENO, buffer, (size_t)n) < 0) {
                 perror("write");
                 _exit(1);
