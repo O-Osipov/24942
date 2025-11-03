@@ -77,9 +77,16 @@ int main(void) {
                 // Skip control characters and non-printable characters
             }
             n = (ssize_t)write_pos;
-            if (robust_write(STDOUT_FILENO, buffer, (size_t)n) < 0) {
-                perror("write");
-                _exit(1);
+            if (n > 0) {
+                if (robust_write(STDOUT_FILENO, buffer, (size_t)n) < 0) {
+                    perror("write");
+                    _exit(1);
+                }
+                // Add newline after output for next input
+                if (robust_write(STDOUT_FILENO, "\n", 1) < 0) {
+                    perror("write");
+                    _exit(1);
+                }
             }
         }
 
