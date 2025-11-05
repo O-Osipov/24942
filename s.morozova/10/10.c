@@ -22,7 +22,7 @@ int main(int argc, char *argv[]) {
         if (WIFEXITED(status)) {
             printf("%d\n", WEXITSTATUS(status));
         } else if (WIFSIGNALED(status)) {
-            printf("%d\n", WTERMSIG(status));
+            printf("\n%d\n", WTERMSIG(status));
         }
     }
     
