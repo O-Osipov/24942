@@ -34,7 +34,7 @@ int main(int argc, char *argv[]){
         execpl("cat", "cat", filename, NULL);
 
         //если дошли сюда - exec не сработал 
-        perror("execpl failed");
+        perror("execlp failed");
         exit(1); 
     }
     //это выполняется в родителе
