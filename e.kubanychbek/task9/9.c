@@ -31,7 +31,7 @@ int main(int argc, char *argv[]){
 
         //исполняем cat fileneme
         //execlp  ЗАМЕНЯЕТ ТЕКУЩИЙ ПРОЦЕСС ->если успешен, ниже код не выполняется
-        execpl("cat", "cat", filename, NULL);
+        execlp("cat", "cat", filename, NULL);
 
         //если дошли сюда - exec не сработал 
         perror("execlp failed");
