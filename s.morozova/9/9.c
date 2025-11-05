@@ -7,7 +7,7 @@ int main() {
     pid_t pid = fork();
     
     if (pid == 0) {
-        execlp("cat", "cat", "long_file.txt", NULL);
+        execlp("cat", "cat", "test.txt", NULL);
         perror("execlp");
         exit(EXIT_FAILURE);
     } else {
