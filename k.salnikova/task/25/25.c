@@ -41,7 +41,7 @@ int main() {
         close(pipefd[0]); 
         
         const char *text = "Hello World!\n"
-                          "This is a Test String with Mixed CASE letters.\n"
+                          "This is a Test String\n"
                           "Programming in C is FUN!\n"
                           "End of transmission.\n";
         

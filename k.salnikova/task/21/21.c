@@ -5,15 +5,8 @@
 
 int beep_count = 0;
 
-void siginth(int sig) {
-    printf("\nBeep count: %d\n", beep_count);
-    exit(0);
-}
-
 int main() {
-    signal(SIGINT, siginth);
-    
-    printf("Program started. Type text and press Enter to beep. Press CTRL-D to exit.\n");
+    printf("Program started. Type text and press Enter to beep. Press 'q' + Enter to exit.\n");
     
     while(1) {
         int c = getchar();
@@ -27,6 +20,14 @@ int main() {
             write(1, "\a", 1); 
             beep_count++;
             printf("Beep! (line completed)\n");
+        }
+        
+        if (c == 'q') {
+            int next_char = getchar();
+            if (next_char == '\n') {
+                printf("\nBeep count: %d\n", beep_count);
+                exit(0);
+            }
         }
     }
     

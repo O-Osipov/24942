@@ -36,46 +36,142 @@ struct editor {
 };
 
 void redraw(struct editor *e) {
+    // Сохраняем позицию курсора, перемещаемся в начало и очищаем строку
     printf("\033[s\033[1;1H\033[2KInput text (CTRL-D at line start to exit):");
+    // Переходим на вторую строку и очищаем экран от курсора до конца
     printf("\033[2;1H\033[J");
     
+
     if (e->len > 0) {
-        int col = 0;
-        for (int i = 0; i < e->len; i++) {
-            putchar(e->text[i]);
-            col++;
-            if (col >= MAX_LINE_LENGTH && e->text[i] != ' ') {
-                int start = i;
-                while (start > 0 && e->text[start - 1] != ' ') start--;
-                if (i - start >= MAX_LINE_LENGTH || (i + 1 < e->len && e->text[i + 1] != ' ')) {
+        int col = 0; 
+        int i = 0;
+        
+        while (i < e->len) {
+
+            if (e->text[i] == ' ' || e->text[i] == '\t') {
+                if (col >= MAX_LINE_LENGTH) {
                     printf("\n");
                     col = 0;
                 }
-            } else if (col >= MAX_LINE_LENGTH) {
-                printf("\n");
-                col = 0;
+                putchar(e->text[i]);
+                col++;
+                i++;
+            } 
+            else {
+
+                int word_start = i;
+                int word_end = i;
+                while (word_end < e->len && e->text[word_end] != ' ' && e->text[word_end] != '\t') {
+                    word_end++;
+                }
+                
+                int word_length = word_end - word_start;
+                
+                if (word_length > MAX_LINE_LENGTH) {
+
+                    int chars_to_print = MAX_LINE_LENGTH - col;
+                    if (chars_to_print <= 0) {
+                        printf("\n");
+                        col = 0;
+                        chars_to_print = MAX_LINE_LENGTH;
+                    }
+                    
+                    for (int j = 0; j < chars_to_print && i < e->len && e->text[i] != ' ' && e->text[i] != '\t'; j++) {
+                        putchar(e->text[i]);
+                        i++;
+                        col++;
+                    }
+                    
+                    if (col >= MAX_LINE_LENGTH) {
+                        printf("\n");
+                        col = 0;
+                    }
+                }
+
+                else if (col + word_length > MAX_LINE_LENGTH) {
+                    printf("\n");
+                    col = 0;
+                    
+
+                    for (int j = word_start; j < word_end; j++) {
+                        putchar(e->text[j]);
+                    }
+                    col += word_length;
+                    i = word_end;
+                }
+
+                else {
+
+                    for (int j = word_start; j < word_end; j++) {
+                        putchar(e->text[j]);
+                    }
+                    col += word_length;
+                    i = word_end;
+                }
             }
         }
     }
     
-    int line = 2, col = 0;
-    for (int i = 0; i < e->pos; i++) {
-        col++;
-        if (col >= MAX_LINE_LENGTH && e->text[i] != ' ') {
-            int start = i;
-            while (start > 0 && e->text[start - 1] != ' ') start--;
-            if (i - start >= MAX_LINE_LENGTH || (i + 1 < e->len && e->text[i + 1] != ' ')) {
+ 
+    int line = 2; 
+    int col = 0;
+    int i = 0;
+    
+
+    while (i < e->pos) {
+        if (e->text[i] == ' ' || e->text[i] == '\t') {
+            if (col >= MAX_LINE_LENGTH) {
                 line++;
                 col = 0;
             }
-        } else if (col >= MAX_LINE_LENGTH) {
-            line++;
-            col = 0;
+            col++;
+            i++;
+        } 
+        else {
+
+            int word_start = i;
+            int word_end = i;
+            while (word_end < e->pos && e->text[word_end] != ' ' && e->text[word_end] != '\t') {
+                word_end++;
+            }
+            
+            int word_length = word_end - word_start;
+            
+
+            if (word_length > MAX_LINE_LENGTH) {
+                int remaining_in_line = MAX_LINE_LENGTH - col;
+                if (remaining_in_line <= 0) {
+                    line++;
+                    col = 0;
+                    remaining_in_line = MAX_LINE_LENGTH;
+                }
+                
+                int chars_to_process = (e->pos - i < remaining_in_line) ? e->pos - i : remaining_in_line;
+                col += chars_to_process;
+                i += chars_to_process;
+                
+                if (col >= MAX_LINE_LENGTH) {
+                    line++;
+                    col = 0;
+                }
+            }
+
+            else if (col + word_length > MAX_LINE_LENGTH) {
+                line++;
+                col = word_length;
+                i = word_end;
+            }
+            else {
+                col += word_length;
+                i = word_end;
+            }
         }
     }
+
     printf("\033[%d;%dH", line, col + 1);
     fflush(stdout);
 }
+    
 
 void erase_word(struct editor *e) {
     if (e->pos == 0) {
