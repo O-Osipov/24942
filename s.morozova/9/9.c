@@ -14,7 +14,7 @@ int main() {
         printf("Родитель печатает текст\n");
         
         waitpid(pid, NULL, 0);
-        printf("/n");
+        printf("\n");
         printf("Последняя строка родителя\n");
     }
     
