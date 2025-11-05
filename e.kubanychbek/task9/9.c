@@ -16,13 +16,13 @@ int main(int argc, char *argv[]){
     char *filename = argv[1];
     //создаем подпроцесс
 
-    """
+    /*    
     Ядро создаёт новый процесс (child) 
     как копию родителя (адресное пространство по copy-on-write).
 
     Теперь у планировщика есть две записи в очереди готовых: 
     родитель и ребёнок.
-    """
+    */
 
     pid_t pid = fork();
     //переменная для хранения статуса завершения дочерного процесса 
@@ -39,7 +39,13 @@ int main(int argc, char *argv[]){
         printf("Child process (PID: %d) executing cat on file: %s\n", getpid(), filename);
 
         //исполняем cat fileneme
-        //execlp  ЗАМЕНЯЕТ ТЕКУЩИЙ ПРОЦЕСС ->если успешен, ниже код не выполняется
+        //execlp  ЗАМЕНЯЕТ ТЕКУЩИЙ ПРОЦЕСС ->если успешен.
+        /*
+        Системный вызов execve (под капотом execlp) замещает 
+        образ процесса: код/данные программы ребёнка заменяются программой cat. 
+        PID остаётся прежним.
+        */
+       
         execlp("cat", "cat", filename, NULL);
 
         //если дошли сюда - exec не сработал 
@@ -50,7 +56,8 @@ int main(int argc, char *argv[]){
     else {
         printf("parent process (PID: %d) created child(PID: %d)\n", getpid(), pid);
 
-        //ждем завершения дочернего процесса 
+        //ждем завершения дочернего процесса, то есть блокируется в ядре
+        //пока дочерний процесс не завершиться
         if (waitpid(pid, &status, 0) == - 1){
             perror("waitpid failed");
             return 1; 
