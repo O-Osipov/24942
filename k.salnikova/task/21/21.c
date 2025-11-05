@@ -5,17 +5,30 @@
 
 int beep_count = 0;
 
-void sigquith(int sig) {
+void siginth(int sig) {
     printf("\nBeep count: %d\n", beep_count);
     exit(0);
 }
 
 int main() {
-    signal(SIGQUIT, sigquith);
+    signal(SIGINT, siginth);
+    
+    printf("Program started. Type text and press Enter to beep. Press CTRL-D to exit.\n");
     
     while(1) {
-        write(1, "\a", 1); 
-        beep_count++;
-        getchar();  
+        int c = getchar();
+        
+        if (c == EOF) {
+            printf("\nBeep count: %d\n", beep_count);
+            exit(0);
+        }
+        
+        if (c == '\n') {
+            write(1, "\a", 1); 
+            beep_count++;
+            printf("Beep! (line completed)\n");
+        }
     }
+    
+    return 0;
 }
