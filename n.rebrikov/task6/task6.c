@@ -6,8 +6,8 @@
 
 typedef struct 
 {
-    off_t offset; // Позиция в файле где НАЧИНАЕТСЯ строка (в байтах от начала)
-    off_t length; // Сколько байт ЗАНИМАЕТ строка (без символа \n)
+    off_t offset;
+    off_t length;
 } Line;
 
 typedef struct 
@@ -19,14 +19,30 @@ typedef struct
 
 // Глобальные переменные для обработки сигнала
 volatile sig_atomic_t timeout_occurred = 0;
-int fd_global; // Сохраняем файловый дескриптор чтобы использовать в обработчике сигнала
+volatile sig_atomic_t user_entered_something = 0;
+int fd_global;
 
-// Обработчик сигнала ALARM
+// Обработчик сигнала ALARM - завершает программу
 void alarm_handler(int sig) 
 {
-    timeout_occurred = 1; // Флаг устанавливается при срабатывании таймера
+    if (!user_entered_something) {
+        printf("\nTIME'S UP! 5 seconds have passed without input. Printing entire file...\n");
+        
+        // Выводим весь файл
+        lseek(fd_global, 0, SEEK_SET);
+        char buffer[1024];
+        ssize_t bytes_read;
+        
+        while ((bytes_read = read(fd_global, buffer, sizeof(buffer))) > 0) 
+        {
+            write(STDOUT_FILENO, buffer, bytes_read);
+        }
+        printf("\n");
+        
+        // Немедленно завершаем программу
+        _exit(0);
+    }
 }
-// SIGALRM посылается когда срабатывает таймер alarm()
 
 void initArray(Array *a) 
 {
@@ -52,24 +68,48 @@ void freeArray(Array *a)
     a->cnt = a->cap = 0;
 }
 
-// Функция для вывода всего файла
-void printEntireFile(int fd) 
+// Функция для вывода таблицы строк
+void printLineTable(int fd, Array *table) 
 {
-    printf("\n=== Timeout! Printing entire file: ===\n");
+    printf("\n=== LINE TABLE ===\n");
+    printf("Line # | Offset | Length | Preview\n");
+    printf("-------+--------+--------+-------------------\n");
     
-    lseek(fd, 0, SEEK_SET);  // Перемещаемся в начало файла
-    // SEEK_SET - отсчет от начала файла
-    
-    char buffer[1024]; // Буфер на 1KB для чтения
-    ssize_t bytes_read; // Сколько байт реально прочитано
-    
-    // Читаем файл блоками по 1024 байта пока не кончится
-    while ((bytes_read = read(fd, buffer, sizeof(buffer))) > 0) 
+    for (int i = 0; i < table->cnt; i++) 
     {
-        write(STDOUT_FILENO, buffer, bytes_read); // Выводим прочитанное на экран
-        // STDOUT_FILENO = 1 (дескриптор стандартного вывода)
+        Line line = table->array[i];
+        
+        off_t current_pos = lseek(fd, 0, SEEK_CUR);
+        char *preview_buf = calloc(line.length + 1, sizeof(char));
+        lseek(fd, line.offset, SEEK_SET);
+        read(fd, preview_buf, line.length);
+        
+        char preview[31];
+        int preview_len = (line.length > 30) ? 30 : line.length;
+        for (int j = 0; j < preview_len; j++) {
+            if (preview_buf[j] == '\n' || preview_buf[j] == '\t' || preview_buf[j] == '\r') {
+                preview[j] = ' ';
+            } else {
+                preview[j] = preview_buf[j];
+            }
+        }
+        preview[preview_len] = '\0';
+        
+        printf("%6d | %6ld | %6ld | %s", 
+               i + 1, 
+               (long)line.offset, 
+               (long)line.length,
+               preview);
+        
+        if (line.length > 30) {
+            printf("...");
+        }
+        printf("\n");
+        
+        free(preview_buf);
+        lseek(fd, current_pos, SEEK_SET);
     }
-    printf("\n");
+    printf("-------+--------+--------+-------------------\n");
 }
 
 Array buildLineTable(int fd) 
@@ -77,30 +117,26 @@ Array buildLineTable(int fd)
     Array table;
     initArray(&table);
     
-    char c; // Буфер для одного символа
-    off_t lineOffset = 0; // Текущая позиция начала строки в файле
-    off_t lineLength = 0; // Длина текущей строки
+    char c;
+    off_t lineOffset = 0;
+    off_t lineLength = 0;
     
-    // Читаем файл по одному символу
-    while (read(fd, &c, 1) == 1) // read возвращает 1 если прочитал символ
+    while (read(fd, &c, 1) == 1)
     {
         if (c == '\n') 
         {
-            // Нашли конец строки - сохраняем информацию
             Line current = {lineOffset, lineLength};
             insertArray(&table, current);
             
-            // Следующая строка начинается после \n
-            lineOffset += lineLength + 1; // +1 потому что пропускаем \n
-            lineLength = 0; // Начинаем считать длину новой строки
+            lineOffset += lineLength + 1;
+            lineLength = 0;
         } 
         else 
         {
-            lineLength++; // Увеличиваем длину текущей строки
+            lineLength++;
         }
     }
     
-    // Если последняя строка не заканчивается \n - сохраняем ее
     if (lineLength > 0) 
     {
         Line current = {lineOffset, lineLength};
@@ -112,22 +148,20 @@ Array buildLineTable(int fd)
 
 void printLine(int fd, Array *table, int lineNumber) 
 {
-    if (table->cnt < lineNumber) // Проверяем что строка существует
+    if (table->cnt < lineNumber) 
     {
         printf("The file contains only %d line(s).\n", table->cnt);
         return;
     }
     
-    // Берем информацию о строке (индексация с 0)
     Line line = table->array[lineNumber - 1];
-    // Выделяем память под строку +1 для нулевого байта
     char *buf = calloc(line.length + 1, sizeof(char));
     
-    lseek(fd, line.offset, SEEK_SET); // Перемещаемся к началу строки в файле
-    read(fd, buf, line.length); // Читаем строку в буфер
+    lseek(fd, line.offset, SEEK_SET);
+    read(fd, buf, line.length);
     
-    printf("%s\n", buf); //Выводим строку
-    free(buf); //Освобождаем память
+    printf("Line %d: %s\n", lineNumber, buf);
+    free(buf);
 }
 
 int main(int argc, char *argv[]) 
@@ -144,7 +178,7 @@ int main(int argc, char *argv[])
         perror("Failed to open file");
         return 1; 
     }
-    fd_global = fd;  // Сохраняем для обработчика сигнала
+    fd_global = fd;
     
     // Настройка обработчика сигнала ALARM
     signal(SIGALRM, alarm_handler);
@@ -152,42 +186,48 @@ int main(int argc, char *argv[])
     // Построение таблицы строк
     Array table = buildLineTable(fd);
     printf("Loaded %d lines from file.\n", table.cnt);
-    printf("You have 5 seconds to enter line number...\n");
+    
+    // Выводим таблицу строк
+    printLineTable(fd, &table);
+    
+    printf("\nYou have 5 seconds to enter first line number!\n");
+    printf("If you enter at least one number, timer stops completely.\n");
+    printf("Otherwise program will print entire file and exit.\n");
     
     // Устанавливаем таймер на 5 секунд
     alarm(5);
     
-    // Основной цикл
-    while (!timeout_occurred) 
+    while (1) 
+{
+    int num;
+    char input[100];  // ← ДОБАВЬ ЭТУ СТРОЧКУ
+    printf("\nEnter the line number (0 to exit): ");
+    
+    // ← ЗАМЕНИ ЭТУ ЧАСТЬ:
+    if (fgets(input, sizeof(input), stdin) != NULL)  // ← Читаем всю строку
     {
-        int num;
-        printf("Enter the line number (0 to exit): ");
+        // ← ДОБАВЬ ЭТИ ДВЕ СТРОЧКИ ВНУТРИ if:
+        user_entered_something = 1;  // ЛЮБОЙ ввод останавливает таймер
+        alarm(0);                    // ОСТАНАВЛИВАЕМ ТАЙМЕР ПОЛНОСТЬЮ
         
-        // Проверяем, что scanf выполнился успешно и не было таймаута
-        if (scanf("%d", &num) == 1) 
+        // Пробуем преобразовать в число
+        if (sscanf(input, "%d", &num) == 1) 
         {
-            // Сбрасываем таймер при успешном вводе
-            alarm(0);
+            if (num == 0) {
+                printf("Normal exit.\n");
+                break;
+            }
             
-            if (num == 0) break;
             printLine(fd, &table, num);
-            
-            // Устанавливаем таймер снова для следующего ввода
-            printf("You have 5 seconds for next input...\n");
-            alarm(5);
         } 
         else 
         {
-            // Если ввод некорректен, очищаем буфер ввода
-            while (getchar() != '\n');
+            printf("Invalid input. Please enter a number.");
         }
     }
-    
-    // Если сработал таймаут, выводим весь файл
-    if (timeout_occurred) 
-    {
-        printEntireFile(fd);
-    }
+}
+
+
     
     close(fd);
     freeArray(&table);

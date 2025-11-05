@@ -40,6 +40,56 @@ void freeArray(Array *a)
     a->cnt = a->cap = 0;
 }
 
+// Функция для вывода таблицы строк
+void printLineTable(int fd, Array *table) 
+{
+    printf("\n=== LINE TABLE ===\n");
+    printf("Line # | Offset | Length | Preview\n");
+    printf("-------+--------+--------+-------------------\n");
+    
+    for (int i = 0; i < table->cnt; i++) 
+    {
+        Line line = table->array[i];
+        
+        // Сохраняем текущую позицию в файле
+        off_t current_pos = lseek(fd, 0, SEEK_CUR);
+        
+        // Читаем строку для предпросмотра
+        char *preview_buf = calloc(line.length + 1, sizeof(char));
+        lseek(fd, line.offset, SEEK_SET);
+        read(fd, preview_buf, line.length);
+        
+        // Обрезаем предпросмотр до 30 символов
+        char preview[31];
+        int preview_len = (line.length > 30) ? 30 : line.length;
+        for (int j = 0; j < preview_len; j++) {
+            if (preview_buf[j] == '\n' || preview_buf[j] == '\t' || preview_buf[j] == '\r') {
+                preview[j] = ' ';  // Заменяем служебные символы на пробелы
+            } else {
+                preview[j] = preview_buf[j];
+            }
+        }
+        preview[preview_len] = '\0';
+        
+        printf("%6d | %6ld | %6ld | %s", 
+               i + 1, 
+               (long)line.offset, 
+               (long)line.length,
+               preview);
+        
+        if (line.length > 30) {
+            printf("...");  // Показываем многоточие если строка обрезана
+        }
+        printf("\n");
+        
+        free(preview_buf);
+        
+        // Восстанавливаем позицию в файле
+        lseek(fd, current_pos, SEEK_SET);
+    }
+    printf("-------+--------+--------+-------------------\n");
+}
+
 // Функция для построения таблицы строк
 Array buildLineTable(int fd) 
 {
@@ -122,11 +172,14 @@ int main(int argc, char *argv[])
     Array table = buildLineTable(fd);
     printf("Loaded %d lines from file.\n", table.cnt);
     
+    // Выводим таблицу строк
+    printLineTable(fd, &table);
+    
     // Основной цикл
-    while(1) 
+    while(1)  // Исправлено: было "while(true)"
     {
         int num;
-        printf("Enter the line number (0 to exit): ");
+        printf("\nEnter the line number (0 to exit): ");
         scanf("%d", &num); // Читаем номер строки
         
         if (num == 0) break; // Выход если ввели 0
