@@ -13,11 +13,13 @@ int main() {
     char buffer[BUFFER_SIZE];
     ssize_t bytes_read;
     
+    // Создаем pipe
     if (pipe(pipefd) == -1) {
         perror("pipe");
         exit(EXIT_FAILURE);
     }
     
+    // Создаем подпроцесс
     pid = fork();
     if (pid == -1) {
         perror("fork");
@@ -25,15 +27,16 @@ int main() {
     }
     
     if (pid == 0) {
-        close(pipefd[1]);
+        // ДОЧЕРНИЙ ПРОЦЕСС: получает и преобразует текст
+        close(pipefd[1]); // Закрываем конец для записи
         
-        printf("Дочерний процесс готов к преобразованию текста...\n");
+        printf("Дочерний процесс: получаю текст и преобразую в верхний регистр...\n");
         
+        // Читаем и преобразуем данные
         while ((bytes_read = read(pipefd[0], buffer, BUFFER_SIZE)) > 0) {
             for (int i = 0; i < bytes_read; i++) {
                 buffer[i] = toupper(buffer[i]);
             }
-            write(STDOUT_FILENO, "Преобразованный текст: ", 23);
             write(STDOUT_FILENO, buffer, bytes_read);
         }
         
@@ -41,16 +44,21 @@ int main() {
         exit(EXIT_SUCCESS);
         
     } else {
-        close(pipefd[0]);
+        // РОДИТЕЛЬСКИЙ ПРОЦЕСС: отправляет смешанный текст
+        close(pipefd[0]); // Закрываем конец для чтения
         
-        printf("Родительский процесс. Введите текст (Ctrl+D для завершения):\n");
+        const char *mixed_text = "Hello World!\n"
+                                "This Is A Mixed Case Text.\n"
+                                "programming in C is FUN!\n"
+                                "Linux POSIX API\n"
+                                "End Of Message.\n";
         
-        while ((bytes_read = read(STDIN_FILENO, buffer, BUFFER_SIZE)) > 0) {
-            write(pipefd[1], buffer, bytes_read);
-        }
+        printf("Родительский процесс: отправляю смешанный текст в канал\n");
+        write(pipefd[1], mixed_text, strlen(mixed_text));
         
         close(pipefd[1]);
         wait(NULL);
+        printf("Родительский процесс: работа завершена\n");
     }
     
     return 0;
