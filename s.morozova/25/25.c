@@ -12,14 +12,13 @@ int main() {
     pid_t pid;
     char buffer[BUFFER_SIZE];
     ssize_t bytes_read;
+    FILE *file;
     
-    // Создаем pipe
     if (pipe(pipefd) == -1) {
         perror("pipe");
         exit(EXIT_FAILURE);
     }
     
-    // Создаем подпроцесс
     pid = fork();
     if (pid == -1) {
         perror("fork");
@@ -27,12 +26,29 @@ int main() {
     }
     
     if (pid == 0) {
-        // ДОЧЕРНИЙ ПРОЦЕСС: получает и преобразует текст
-        close(pipefd[1]); // Закрываем конец для записи
+        close(pipefd[0]);
         
-        printf("Дочерний процесс: получаю текст и преобразую в верхний регистр...\n");
+        file = fopen("text.txt", "r");
+        if (file == NULL) {
+            perror("fopen");
+            exit(EXIT_FAILURE);
+        }
         
-        // Читаем и преобразуем данные
+        printf("Дочерний процесс: читаю текст из text.txt и отправляю в канал\n");
+        
+        while ((bytes_read = fread(buffer, 1, BUFFER_SIZE, file)) > 0) {
+            write(pipefd[1], buffer, bytes_read);
+        }
+        
+        fclose(file);
+        close(pipefd[1]);
+        exit(EXIT_SUCCESS);
+        
+    } else {
+        close(pipefd[1]);
+        
+        printf("Родительский процесс: получаю текст и преобразую в верхний регистр...\n\n");
+        
         while ((bytes_read = read(pipefd[0], buffer, BUFFER_SIZE)) > 0) {
             for (int i = 0; i < bytes_read; i++) {
                 buffer[i] = toupper(buffer[i]);
@@ -41,24 +57,8 @@ int main() {
         }
         
         close(pipefd[0]);
-        exit(EXIT_SUCCESS);
-        
-    } else {
-        // РОДИТЕЛЬСКИЙ ПРОЦЕСС: отправляет смешанный текст
-        close(pipefd[0]); // Закрываем конец для чтения
-        
-        const char *mixed_text = "Hello World!\n"
-                                "This Is A Mixed Case Text.\n"
-                                "programming in C is FUN!\n"
-                                "Linux POSIX API\n"
-                                "End Of Message.\n";
-        
-        printf("Родительский процесс: отправляю смешанный текст в канал\n");
-        write(pipefd[1], mixed_text, strlen(mixed_text));
-        
-        close(pipefd[1]);
         wait(NULL);
-        printf("Родительский процесс: работа завершена\n");
+        printf("\nОба процесса завершили работу.\n");
     }
     
     return 0;
