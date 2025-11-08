@@ -20,7 +20,7 @@ int main(int argc, char *argv[]) {
         waitpid(pid, &status, 0);
         
         if (WIFEXITED(status)) {
-            printf("%d\n", WEXITSTATUS(status));
+            printf("\n%d\n", WEXITSTATUS(status));
         } else if (WIFSIGNALED(status)) {
             printf("\n%d\n", WTERMSIG(status));
         }
