@@ -132,7 +132,7 @@ int main(int argc, char *argv[])
     // Проверка на количество файлов
     if (argc < 2) 
     {
-        fprintf(stderr, "Использование: %s файл1 [файл2 ...]\n", argv[0]);
+        fprintf(stderr, "Должен быть введен хотя бы один файл");
         return 1;
     }
     
