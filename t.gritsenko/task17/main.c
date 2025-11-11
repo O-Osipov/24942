@@ -23,7 +23,7 @@ void enableRawMode() {
 
 int main() {
     enableRawMode();
-    
+
     char c;
     static char line[LINE_LENGTH + 1];
 
@@ -79,25 +79,28 @@ int main() {
             }
 
         } else {
-            if (len == LINE_LENGTH) {
 
+            if (len == LINE_LENGTH) {
+                
                 int i = len - 1;
                 while (i >= 0 && line[i] != ' ') i--;
                 int word_start = i + 1;
-                
-                // Перенос слова на новую строчку
-                if (word_start != 0  && word_start != 40) {
-                    printf("\33[%dD\33[K", len - word_start);
-                    putchar('\n');
-                    printf(line + word_start);
 
-                    memmove(line, line + word_start, len - word_start);
-                    len = len - word_start;
+                if (word_start > 0 && word_start < len) {
+                    int move = len - word_start;
+                    printf("\33[%dD\33[K", move);
+
+                    putchar('\n');
+                    printf("%s", line + word_start);
+
+                    memmove(line, line + word_start, move + 1);
+                    len = move;
+
                 } else {
                     putchar('\n');
+                    line[0] = 0;
                     len = 0;
                 }
-
             }
 
             line[len++] = c;
