@@ -12,7 +12,7 @@ int main(int argc, char *argv[])
     // Проверяем наличие аргументов
     if (argc == 1) 
     {
-        fprintf(stderr, "Input error");
+        fprintf(stderr, "Input error\n");
         return 1;
     }
     

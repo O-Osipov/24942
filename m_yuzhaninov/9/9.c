@@ -12,7 +12,7 @@ int main(int argc, char *argv[])
     // Проверяем наличие аргумента (имя файла)
     if (argc != 2) 
     {
-        fprintf(stderr, "Input error");
+        fprintf(stderr, "Input error\n");
         return 1;
     }
     
