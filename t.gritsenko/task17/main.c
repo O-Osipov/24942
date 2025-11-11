@@ -47,16 +47,12 @@ int main() {
                 
                 printf("\b \b");
 
-                break;
-
             } else if (c == t.c_cc[VKILL]) {
                 // KILL - стереть все символы в строке.
                 line[0] = 0;
 
                 // [2K - чистит строку целиком
                 printf("\33[2K\r");
-
-                break;
 
             } else if (c == t.c_cc[VWERASE]) {
                 // CTRL-W - стереть последнее слово в строке
@@ -75,21 +71,16 @@ int main() {
                 // [K - чистит строку справа от курсора
                 printf("\33[%dD\33[K", len - word_start);
 
-                break;
-
             } else if (c == t.c_cc[VEOF]) {
                 // CTRL-D - завершение программы, если
                 // курсор находится в начале строки
 
                 if (line[0] == 0) { exit(0); }
-                break;
 
             } else {
                 // Все остальные непечатаемые символы должны
                 // издавать звуковой сигнал (CTRL-G)
                 putchar('\a');
-
-                break;
             }
 
         } else {
