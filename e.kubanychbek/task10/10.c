@@ -101,3 +101,4 @@ WIFSIGNALED(status) — процесс убит сигналом (наприме
         printf("process did not exit normally\n");
         return 1;
     }
+}
