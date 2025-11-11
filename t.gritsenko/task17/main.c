@@ -23,12 +23,7 @@ void enableRawMode() {
 
 int main() {
     enableRawMode();
-
-    char erase_char      = t.c_cc[VERASE];   // аналог CERASE
-    char kill_char       = t.c_cc[VKILL];    // аналог CKILL
-    char word_erase_char = t.c_cc[VWERASE];  // аналог CWERASE (если поддерживается)
-    char eof_char        = t.c_cc[VEOF];     // аналог CEOF
-
+    
     char c;
     static char line[LINE_LENGTH + 1];
 
