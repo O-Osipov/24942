@@ -3,21 +3,20 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <ctype.h>
-#include <sys/ttydefaults.h>
 #include <string.h>
 
 #define LINE_LENGTH 40
-struct termios orig_termios;
+struct termios t;
 
 void disableRawMode() {
-    tcsetattr(STDIN_FILENO, TCSAFLUSH, &orig_termios);  //set old terminal settings
+    tcsetattr(STDIN_FILENO, TCSAFLUSH, &t);  //set old terminal settings
 }
 
 void enableRawMode() {
-    tcgetattr(STDIN_FILENO, &orig_termios);     //remember default termios
+    tcgetattr(STDIN_FILENO, &t);     //remember default termios
     atexit(disableRawMode);                     //call on exit
 
-    struct termios raw = orig_termios;
+    struct termios raw = t;
     raw.c_lflag &= ~(ECHO | ICANON);            //disable echo and canon mode
     tcsetattr(STDIN_FILENO, TCSAFLUSH, &raw);   //set new terminal settings
 }
@@ -25,72 +24,74 @@ void enableRawMode() {
 int main() {
     enableRawMode();
 
+    char erase_char      = t.c_cc[VERASE];   // аналог CERASE
+    char kill_char       = t.c_cc[VKILL];    // аналог CKILL
+    char word_erase_char = t.c_cc[VWERASE];  // аналог CWERASE (если поддерживается)
+    char eof_char        = t.c_cc[VEOF];     // аналог CEOF
+
     char c;
     static char line[LINE_LENGTH + 1];
 
      while (read(STDIN_FILENO, &c, 1) == 1) {
         int len = strlen(line);
         if (iscntrl(c) || !isprint(c)) {
-            switch (c) {
-                case CERASE: {
-                    // ERASE - стереть последний симовол в строке.
 
-                    line[len - 1] = 0;
+            if (c == t.c_cc[VERASE]) {
+                // ERASE - стереть последний симовол в строке.
 
-                    // [D - двигает курсор на знак влево
-                    // [K - чистит строку справа от курсора
-                    // printf("\33[D\33[K");
-                    
-                    printf("\b \b");
+                line[len - 1] = 0;
 
-                    break;
-                }
+                // [D - двигает курсор на знак влево
+                // [K - чистит строку справа от курсора
+                // printf("\33[D\33[K");
+                
+                printf("\b \b");
 
-                case CKILL: {
-                    // KILL - стереть все символы в строке.
-                    line[0] = 0;
+                break;
 
-                    // [2K - чистит строку целиком
-                    printf("\33[2K\r");
+            } else if (c == t.c_cc[VKILL]) {
+                // KILL - стереть все символы в строке.
+                line[0] = 0;
 
-                    break;
-                }
+                // [2K - чистит строку целиком
+                printf("\33[2K\r");
 
-                case CWERASE: {
-                    // CTRL-W - стереть последнее слово в строке
+                break;
 
-                    int word_start = 0;
-                    char prev = ' ';
-                    for (int i = 0; i < len; i++) {
-                        if (line[i] != ' ' && prev == ' ') {
-                            word_start = i;
-                        }
-                        prev = line[i];
+            } else if (c == t.c_cc[VWERASE]) {
+                // CTRL-W - стереть последнее слово в строке
+
+                int word_start = 0;
+                char prev = ' ';
+                for (int i = 0; i < len; i++) {
+                    if (line[i] != ' ' && prev == ' ') {
+                        word_start = i;
                     }
-                    line[word_start] = 0;
-
-                    // [<n>D - двигает курсор на n знаков влево
-                    // [K - чистит строку справа от курсора
-                    printf("\33[%dD\33[K", len - word_start);
-
-                    break;
+                    prev = line[i];
                 }
+                line[word_start] = 0;
 
-                case CEOF: {
-                    // CTRL-D - завершение программы, если
-                    // курсор находится в начале строки
+                // [<n>D - двигает курсор на n знаков влево
+                // [K - чистит строку справа от курсора
+                printf("\33[%dD\33[K", len - word_start);
 
-                    if (line[0] == 0) { exit(0); }
-                    break;
-                }
+                break;
 
-                default: {
-                    // Все остальные непечатаемые символы должны
-                    // издавать звуковой сигнал (CTRL-G)
-                    putchar('\a');
-                    break;
-                }
+            } else if (c == t.c_cc[VEOF]) {
+                // CTRL-D - завершение программы, если
+                // курсор находится в начале строки
+
+                if (line[0] == 0) { exit(0); }
+                break;
+
+            } else {
+                // Все остальные непечатаемые символы должны
+                // издавать звуковой сигнал (CTRL-G)
+                putchar('\a');
+
+                break;
             }
+
         } else {
             if (len == LINE_LENGTH) {
 
