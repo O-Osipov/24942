@@ -17,7 +17,7 @@ cc -Wall -Wextra -o task10 10.c
 
 int main(int argc, char *argv[]){
     //проверяем проведена ли хотя бы одна команда
-     if (argc != 2){
+     if (argc < 2){
         fprintf(stderr, "usage: %s command [argv...]\n", argv[0]);
         fprintf(stderr, "example: %s /bin/ls -la\n", argv[0]);
         return 2; //код 2 - типичный для неверного использования 
