@@ -110,7 +110,7 @@ void print_file_info(const char *path)
     // Получаем текущее время
     tm = localtime(&sb.st_mtime);
     // Красиво его структурируем и выводим
-    strftime(date_str, 20, "%b %e %H:%M", tm);
+    strftime(date_str, 20, "%b %e %Y", tm);
     printf("%-*s ", 5, date_str);
 
     // Оставляем только имя файла
