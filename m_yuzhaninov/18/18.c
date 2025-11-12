@@ -56,7 +56,7 @@ void print_file_info(const char *path)
     struct group *gr;
     // Структура для хранения информации о времени
     struct tm *tm;
-    char date_str[5];
+    char date_str[20];
 
     // Получаем информацию о файле
     if (lstat(path, &sb) == -1) 
@@ -98,7 +98,7 @@ void print_file_info(const char *path)
     }
 
     // Если это файл, то выводим его размер
-    if (S_ISREG(sb.st_mode)) 
+    if (S_ISREG(sb.st_mode) || S_ISDIR(sb.st_mode))
     {
         printf("%*ld ", 5, sb.st_size);
     } 
@@ -110,7 +110,7 @@ void print_file_info(const char *path)
     // Получаем текущее время
     tm = localtime(&sb.st_mtime);
     // Красиво его структурируем и выводим
-    strftime(date_str, 5, "%b %e %H:%M", tm);
+    strftime(date_str, 20, "%b %e %H:%M", tm);
     printf("%-*s ", 5, date_str);
 
     // Оставляем только имя файла
