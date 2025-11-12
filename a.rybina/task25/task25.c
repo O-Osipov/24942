@@ -59,7 +59,7 @@ int main(void) {
     if (pid == 0) {
         // Child: ignore control signals as well
         signal(SIGINT, SIG_IGN);   // Ignore CTRL+C
-        signal(SIGQUIT, SIG_IGN);  // Ignore CTRL+\
+        signal(SIGQUIT, SIG_IGN);  // Ignore CTRL+\/
         signal(SIGTSTP, SIG_IGN); // Ignore CTRL+Z
         
         // Child: read from pipe, convert to upper-case, write to stdout
