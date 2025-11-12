@@ -8,6 +8,7 @@
 #include <stdlib.h>
 #include <errno.h>
 #include <sys/wait.h>
+#include <signal.h>
 
 static ssize_t robust_read(int fd, void *buf, size_t count) {
     for (;;) {
@@ -34,8 +35,13 @@ static ssize_t robust_write(int fd, const void *buf, size_t count) {
 }
 
 int main(void) {
+    // Ignore control signals so they don't terminate the program
+    signal(SIGINT, SIG_IGN);   // Ignore CTRL+C
+    signal(SIGQUIT, SIG_IGN);  // Ignore CTRL+\
+    signal(SIGTSTP, SIG_IGN); // Ignore CTRL+Z
+    
     printf("Pipe program: Parent sends text, child converts to uppercase.\n");
-    printf("Type text (Ctrl+D to finish):\n");
+    printf("Type text (Ctrl+D to finish, control signals are ignored):\n");
     fflush(stdout);
     
     int pipe_fds[2];
@@ -51,6 +57,11 @@ int main(void) {
     }
 
     if (pid == 0) {
+        // Child: ignore control signals as well
+        signal(SIGINT, SIG_IGN);   // Ignore CTRL+C
+        signal(SIGQUIT, SIG_IGN);  // Ignore CTRL+\
+        signal(SIGTSTP, SIG_IGN); // Ignore CTRL+Z
+        
         // Child: read from pipe, convert to upper-case, write to stdout
         if (close(pipe_fds[1]) == -1) {
             perror("close");
