@@ -8,7 +8,6 @@
 #include <stdlib.h>
 #include <errno.h>
 #include <sys/wait.h>
-#include <signal.h>
 
 static ssize_t robust_read(int fd, void *buf, size_t count) {
     for (;;) {
@@ -35,13 +34,8 @@ static ssize_t robust_write(int fd, const void *buf, size_t count) {
 }
 
 int main(void) {
-    // Ignore control signals so they don't terminate the program
-    signal(SIGINT, SIG_IGN);   // Ignore CTRL+C
-    signal(SIGQUIT, SIG_IGN);  // Ignore CTRL+\
-    signal(SIGTSTP, SIG_IGN); // Ignore CTRL+Z
-    
     printf("Pipe program: Parent sends text, child converts to uppercase.\n");
-    printf("Type text (Ctrl+D to finish, control signals are ignored):\n");
+    printf("Type text (Ctrl+D to finish):\n");
     fflush(stdout);
     
     int pipe_fds[2];
@@ -57,10 +51,6 @@ int main(void) {
     }
 
     if (pid == 0) {
-        signal(SIGINT, SIG_IGN);
-        signal(SIGQUIT, SIG_IGN);
-        signal(SIGTSTP, SIG_IGN);
-        
         // Child: read from pipe, convert to upper-case, write to stdout
         if (close(pipe_fds[1]) == -1) {
             perror("close");
@@ -70,7 +60,7 @@ int main(void) {
         char buffer[8192];
         for (;;) {
             ssize_t n = robust_read(pipe_fds[0], buffer, sizeof(buffer));
-            if (n == 0) break;            // EOF
+            if (n == 0) break;
             if (n < 0) {
                 perror("read");
                 _exit(1);
@@ -78,13 +68,11 @@ int main(void) {
             size_t write_pos = 0;
             for (ssize_t i = 0; i < n; ++i) {
                 unsigned char ch = (unsigned char)buffer[i];
-                // Only process letters, numbers, and printable special characters
                 // Filter out control characters that might trigger commands
                 if (isalnum(ch) || isprint(ch)) {
                     buffer[write_pos] = (char)(isalpha(ch) ? toupper(ch) : ch);
                     write_pos++;
                 }
-                // Skip control characters and non-printable characters
             }
             n = (ssize_t)write_pos;
             if (n > 0) {
@@ -116,7 +104,7 @@ int main(void) {
     char buffer[8192];
     for (;;) {
         ssize_t n = robust_read(STDIN_FILENO, buffer, sizeof(buffer));
-        if (n == 0) break;            // EOF on stdin
+        if (n == 0) break;
         if (n < 0) {
             perror("read");
             break;
