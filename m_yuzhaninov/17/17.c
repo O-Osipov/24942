@@ -15,6 +15,8 @@ int main()
     char line[MAX_LINE+1] = {0}; 
     // Позиция курсора
     int pos = 0;        
+    int escape_state=0;
+    int rus_symb=0;
 
     // Получаем текущие настройки терминала
     if (tcgetattr(STDIN_FILENO, &old_tio) == -1) 
@@ -50,6 +52,38 @@ int main()
             tcsetattr(STDIN_FILENO, TCSANOW, &old_tio);
             perror("read");
             return 1;
+        }
+
+        // Обработка ESC
+        if (escape_state == 0 && c == 0x1b) 
+        {
+            printf("\x07");
+            printf("\nВведен некорректный символ\n");
+            fflush(stdout);
+            escape_state = 2; 
+            pos = 0;
+            continue;
+        } 
+        else if (escape_state > 0) 
+        {
+            escape_state--;
+            continue;
+        }
+
+        // Обработка русских букв
+        if (rus_symb == 0 && (unsigned char)c & 0x80) 
+        {
+            printf("\x07");
+            printf("\nВведен некорректный символ\n");
+            fflush(stdout);
+            rus_symb = 1;
+            pos = 0;
+            continue;
+        } 
+        else if (rus_symb == 1)
+        {
+            rus_symb = 0;
+            continue;
         }
 
         // Ставим курсор на прошлый символ
@@ -96,6 +130,7 @@ int main()
                 {
                     printf("\b \b");
                     fflush(stdout);
+                    line[j] = '\0';
                 }
 
                 // Удаляем затертые символы из буфера
@@ -132,9 +167,8 @@ int main()
                     printf("\b \b");
                     fflush(stdout);
                     pos--;
+                    line[pos] = '\0';
                 }
-                // Удаляем символы из буфера
-                line[pos] = '\0';
                 break;
     
 
@@ -148,8 +182,7 @@ int main()
                 } 
                 else 
                 {
-                    // Если еще нет переполнения
-                    if (pos >= MAX_LINE) 
+                    if (pos == MAX_LINE) 
                     {
                         int word_start = pos;
                         // Находим начало текущего слова
@@ -158,15 +191,15 @@ int main()
                             word_start--;
                         }
 
-                        // Стираем слово из текущей строки
+                        // Стираем слово с экрана
                         for (int i = word_start; i < pos; i++) 
                         {
                             printf("\b \b");
                             fflush(stdout);
                         }
-                        
+
                         // Сохраняем слово во временный буфер
-                        char temp[MAX_LINE+1] = {0};
+                        char temp[MAX_LINE] = {0};
                         int len = 0;
                         for (int i = word_start; i < pos; i++) 
                         {
@@ -174,26 +207,34 @@ int main()
                         }
                         temp[len] = '\0';
 
-                        // Ставим курсор на начало слова
-                        pos = word_start;
-                        // Обрезаем последнее слово
-                        line[pos] = '\0';
+                        // Очищаем часть строки от word_start до конца
+                        for (int i = word_start; i <= pos; i++) 
+                        {
+                            line[i] = '\0';
+                        }
+                        pos = word_start;  // Обновляем позицию курсора
 
                         // Переходим на новую строку
                         printf("\n");
                         fflush(stdout);
-                        
-                        // Выводим слово
+
+                        // Выводим сохранённое слово в новой строке
                         printf("%s", temp);
                         fflush(stdout);
-                        pos = len;
 
+                        // Обновляем line и pos для новой строки
+                        strcpy(line, temp);
+                        pos = len;
                     }
-                    // Добавляем символ в буфер и отображаем
-                    line[pos++] = c;
-                    line[pos] = '\0';
-                    printf("%c", c);
-                    fflush(stdout);
+
+                    else
+                    {
+                        // Добавляем символ в буфер и отображаем
+                        line[pos++] = c;
+                        line[pos] = '\0';
+                        printf("%c", c);
+                        fflush(stdout);
+                    }
                 }
                 break;
         }
