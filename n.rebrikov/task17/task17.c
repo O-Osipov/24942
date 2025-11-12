@@ -6,10 +6,10 @@
 #include <string.h>
 
 
-#define CERASE   0177  // Backspace (обычно Ctrl+H или Backspace)
-#define CKILL    0025  // Ctrl+U (удалить всю строку)
-#define CWERASE  0027  // Ctrl+W (удалить слово)
-#define CEOF     0004  // Ctrl+D (завершить программу)
+#define MY_CERASE   0x7F  // Backspace (обычно Ctrl+H или Backspace)
+#define MY_CKILL    0x15  // Ctrl+U (удалить всю строку)
+#define MY_CWERASE  0x17  // Ctrl+W (удалить слово)
+#define MY_CEOF     0x04  // Ctrl+D (завершить программу)
 
 
 #define LINE_LENGTH 40
@@ -48,7 +48,7 @@ int main()
 {
     enableRawMode();
 
-    char c;
+    unsigned char c;
     static char line[LINE_LENGTH + 1];
 
     while (read(STDIN_FILENO, &c, 1) == 1) 
@@ -60,7 +60,7 @@ int main()
         {
             switch (c) 
             {
-                case CERASE: 
+                case MY_CERASE: 
                 {
                     // Когда вводится символ ERASE, стирается
                     // последний символ в текущей строке.
@@ -74,7 +74,7 @@ int main()
                     break;
                 }
 
-                case CKILL: 
+                case MY_CKILL: 
                 {
                     // Когда вводится символ KILL, стираются
                     // все символы в текущей строке.
@@ -87,14 +87,16 @@ int main()
                     break;
                 }
 
-                case CWERASE: 
+                case MY_CWERASE: 
                 {
                     // Когда вводится CTRL+W, стирается последнее слово в текущей
                     // строке, вместе со всеми следующими за ним пробелами.
 
                     int word_start = 0;
                     char prev = ' ';
-                    for (int i = 0; i < len; i++) {
+		    int i;
+                    for(i = 0; i < len; i++) 
+			{
                         if (line[i] != ' ' && prev == ' ') 
                         {
                             word_start = i;
@@ -111,7 +113,7 @@ int main()
                     break;
                 }
 
-                case CEOF: 
+                case MY_CEOF: 
                 {
                     // Программа завершается, когда введен CTRL+D
                     // и курсор находится в начале строки.
