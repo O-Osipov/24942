@@ -35,9 +35,10 @@ void enableRawMode()
     raw.c_lflag &= ~(ECHO | ICANON);
     /*
     ECHO - отображать вводимые символы на экране
-
     ICANON - построчный (канонический) режим ввода
     */
+    raw.c_cc[VMIN] = 1; // Ж�дать минимум 1 символ
+    raw.c_cc[VTIME] = 0; // �,tp nfqvfenf
 
     // 5. Применяем новые настройки
     tcsetattr(STDIN_FILENO, TCSAFLUSH, &raw);
