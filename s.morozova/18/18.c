@@ -83,26 +83,15 @@ void print_file_info(const char *filename) {
         snprintf(group_name, MAX_GROUPNAME, "%d", st.st_gid);
     }
     
-    // Вывод с фиксированной шириной полей
-    if (S_ISREG(st.st_mode)) {
-        printf("%s %2ld %-8s %-8s %8ld %s %s\n", 
-               perms, 
-               st.st_nlink,
-               user_name,
-               group_name,
-               st.st_size,
-               date_str,
-               basename);
-    } else {
-        printf("%s %2ld %-8s %-8s %8s %s %s\n", 
-               perms, 
-               st.st_nlink,
-               user_name,
-               group_name,
-               "",
-               date_str,
-               basename);
-    }
+    // Вывод размера файла для всех типов файлов
+    printf("%s %2ld %-8s %-8s %8ld %s %s\n", 
+           perms, 
+           st.st_nlink,
+           user_name,
+           group_name,
+           st.st_size,  // Всегда выводим размер
+           date_str,
+           basename);
 }
 
 int main(int argc, char *argv[]) {
