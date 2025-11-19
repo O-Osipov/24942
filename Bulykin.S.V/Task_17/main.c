@@ -98,7 +98,31 @@ int main() {
         }
         else {
             if (len == LINE_LENGTH) {
+                int chars_to_erase = 0;
+                static char buf[LINE_LENGTH + 1];
+                if (len > 0) {
+                    int word_start = 0;
+                    char prev = ' ';
+                    for (int i = 0; i < len; i++) {
+                        if (line[i] != ' ' && prev == ' ') {
+                            word_start = i;
+                        }
+                        prev = line[i];
+                    }
+                    chars_to_erase = len - word_start;
+                    for (int i = 0 ; i < chars_to_erase; i++){
+                        buf[i] = line[word_start+i];
+                    }
+                    line[word_start] = '\0';
+                    len = word_start;
+
+                    printf("\33[%dD\33[K", chars_to_erase);
+                }
                 putchar('\n');
+                if (chars_to_erase > 0)
+                    for (int i = 0; i < chars_to_erase; i++){
+                        putchar(buf[i]);
+                    }
                 len = 0;
                 line[0] = '\0';
             }

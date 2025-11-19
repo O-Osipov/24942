@@ -49,7 +49,8 @@ void print_file_info(const char *path) {
     const char *group = gr ? gr->gr_name : "?";
     
     // File size (only for regular files)
-    off_t size = S_ISREG(st.st_mode) ? st.st_size : 0;
+    // off_t size = S_ISREG(st.st_mode) ? st.st_size : 0;
+    off_t size = st.st_size;
     
     // Modification time
     struct tm *tm_info = localtime(&st.st_mtime);
@@ -70,9 +71,9 @@ void print_file_info(const char *path) {
                file_type, perms, (unsigned long)nlinks,
                owner, group, (long)size, time_str, filename);
     } else {
-        printf("%c%s %3lu %-8s %-8s %8s %s %s\n",
+        printf("%c%s %3lu %-8s %-8s %8ld %s %s\n",
                file_type, perms, (unsigned long)nlinks,
-               owner, group, "", time_str, filename);
+               owner, group, (long)size, time_str, filename);
     }
 }
 
