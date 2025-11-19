@@ -1,6 +1,6 @@
 CC = gcc
 CFLAGS = -Wall -Wextra -std=c99
-LDFLAGS = -lsocket -lnsl -lrt
+LDFLAGS = -lsocket -lnsl -lrt -luring
 
 all: server client
 
