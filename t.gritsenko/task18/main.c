@@ -7,6 +7,40 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <dirent.h>
+
+long long get_dir_size(const char *path) {
+    long long total = 0;
+
+    DIR *dir = opendir(path);
+    if (!dir) return 0;
+
+    struct dirent *entry;
+    struct stat st;
+    char fullpath[4096];
+
+    while ((entry = readdir(dir)) != NULL) {
+
+        // Пропускаем . и ..
+        if (strcmp(entry->d_name, ".") == 0 ||
+            strcmp(entry->d_name, "..") == 0)
+            continue;
+
+        snprintf(fullpath, sizeof(fullpath), "%s/%s", path, entry->d_name);
+
+        if (lstat(fullpath, &st) == -1)
+            continue;
+
+        if (S_ISDIR(st.st_mode)) {
+            total += get_dir_size(fullpath);
+        } else if (S_ISREG(st.st_mode)) {
+            total += st.st_size;
+        }
+    }
+
+    closedir(dir);
+    return total;
+}
 
 static void print_separator() {
     printf("+---+-----------+------------+------------+------------+-----------------+------------------+\n");
@@ -57,6 +91,9 @@ static void print_file_info(const char *path) {
     char sizebuf[16];
     if (S_ISREG(st.st_mode)) {
         snprintf(sizebuf, sizeof(sizebuf), "%ld", (long)st.st_size);
+    } else if (S_ISDIR(st.st_mode)) {
+        long long total = get_dir_size(path);
+        snprintf(sizebuf, sizeof(sizebuf), "%ld", total);
     } else {
         sizebuf[0] = '\0';
     }
