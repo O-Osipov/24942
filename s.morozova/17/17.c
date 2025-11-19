@@ -6,7 +6,6 @@
 #include <ctype.h>
 
 #define MAX_LINE 40
-#define BELL '\x07'
 
 // Управляющие символы
 #define ERASE 0x7F  // Backspace (127)
@@ -32,10 +31,14 @@ void enable_raw_mode() {
     tcsetattr(STDIN_FILENO, TCSAFLUSH, &raw);
 }
 
+void sound_bell() {
+    write(STDOUT_FILENO, "\x07", 1);
+}
+
 // Удаляет последнее слово в строке
 void erase_last_word(char *line, int *pos) {
     if (*pos == 0) {
-        write(STDOUT_FILENO, &BELL, 1);
+        sound_bell();
         return;
     }
 
@@ -86,7 +89,7 @@ int main() {
                 printf("\b \b");
                 fflush(stdout);
             } else {
-                write(STDOUT_FILENO, &BELL, 1);
+                sound_bell();
             }
         }
         else if (c == KILL) { // Удалить всю строку
@@ -106,6 +109,7 @@ int main() {
                 line[pos++] = c;
                 col++;
                 
+                // Перенос строки при достижении 40 символов
                 if (col >= MAX_LINE) {
                     printf("\n");
                     col = 0;
@@ -114,11 +118,11 @@ int main() {
                 write(STDOUT_FILENO, &c, 1);
                 fflush(stdout);
             } else {
-                write(STDOUT_FILENO, &BELL, 1);
+                sound_bell();
             }
         }
         else { // Непечатаемые символы
-            write(STDOUT_FILENO, &BELL, 1);
+            sound_bell();
         }
 
         line[pos] = '\0';
