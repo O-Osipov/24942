@@ -26,32 +26,39 @@ void enable_raw_mode() {
 }
 
 void sound_bell() {
-    printf("\a"); // Простой способ издать звуковой сигнал
+    printf("\a");
     fflush(stdout);
 }
 
-void erase_last_word(char *line, int *pos) {
+void erase_last_word(char *line, int *pos, int *col) {
     if (*pos == 0) {
         sound_bell();
         return;
     }
 
+    int start_pos = *pos;
+    
     // Пропускаем пробелы в конце
     while (*pos > 0 && isspace(line[*pos - 1])) {
         (*pos)--;
+        (*col)--;
     }
     
-    // Удаляем слово
+    // Удаляем слово (до пробела или начала строки)
     while (*pos > 0 && !isspace(line[*pos - 1])) {
         (*pos)--;
+        (*col)--;
     }
 
     // Перерисовываем строку
-    printf("\r\033[K"); // Возврат и очистка строки
+    printf("\r\033[K"); // Возврат в начало и очистка строки
     if (*pos > 0) {
         write(STDOUT_FILENO, line, *pos);
     }
     fflush(stdout);
+    
+    // Обновляем буфер
+    line[*pos] = '\0';
 }
 
 int main() {
@@ -69,18 +76,19 @@ int main() {
         if (read(STDIN_FILENO, &c, 1) != 1) break;
 
         // Ctrl-D в начале строки - выход
-        if (c == 4 && pos == 0) { // 4 = Ctrl-D
+        if (c == 4 && pos == 0) {
             printf("\n");
             break;
         }
 
-        // Backspace (127 или 8)
+        // Backspace
         if (c == 127 || c == 8) {
             if (pos > 0) {
                 pos--;
                 col--;
                 printf("\b \b");
                 fflush(stdout);
+                line[pos] = '\0';
             } else {
                 sound_bell();
             }
@@ -93,11 +101,11 @@ int main() {
                 printf("\b \b");
             }
             fflush(stdout);
+            line[0] = '\0';
         }
         // Ctrl-W - удалить последнее слово
         else if (c == 23) {
-            erase_last_word(line, &pos);
-            col = pos;
+            erase_last_word(line, &pos, &col);
         }
         // Печатаемые символы
         else if (c >= 32 && c <= 126) {
@@ -113,6 +121,7 @@ int main() {
                 
                 write(STDOUT_FILENO, &c, 1);
                 fflush(stdout);
+                line[pos] = '\0';
             } else {
                 sound_bell();
             }
@@ -121,8 +130,6 @@ int main() {
         else {
             sound_bell();
         }
-
-        line[pos] = '\0';
     }
 
     return 0;
