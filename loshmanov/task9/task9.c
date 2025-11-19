@@ -7,7 +7,7 @@ int main(int argc, char *argv[]) {
     // Файл, который будет "длинным" для cat.
     // Можно передать через аргумент командной строки:
     // ./a.out some_long_file.txt
-    const char *filename = (argc > 1) ? argv[1] : "../task9.c";
+    const char *filename = (argc > 1) ? argv[1] : "test_for9.txt";
 
     // На всякий случай явно отключим буферизацию stdout,
     // чтобы вывод родителя и cat шёл сразу:
