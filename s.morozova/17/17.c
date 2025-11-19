@@ -26,39 +26,37 @@ void enable_raw_mode() {
 }
 
 void sound_bell() {
-    printf("\a");
+    write(STDOUT_FILENO, "\a", 1);
+}
+
+void redraw_line(const char *line, int pos) {
+    printf("\r\033[K"); // курсор в начало, очистить строку
+    if (pos > 0) {
+        write(STDOUT_FILENO, line, pos);
+    }
     fflush(stdout);
 }
 
-void erase_last_word(char *line, int *pos, int *col) {
+void erase_last_word(char *line, int *pos) {
     if (*pos == 0) {
         sound_bell();
         return;
     }
 
-    int start_pos = *pos;
+    int new_pos = *pos;
     
     // Пропускаем пробелы в конце
-    while (*pos > 0 && isspace(line[*pos - 1])) {
-        (*pos)--;
-        (*col)--;
+    while (new_pos > 0 && isspace(line[new_pos - 1])) {
+        new_pos--;
     }
     
-    // Удаляем слово (до пробела или начала строки)
-    while (*pos > 0 && !isspace(line[*pos - 1])) {
-        (*pos)--;
-        (*col)--;
+    // Удаляем слово
+    while (new_pos > 0 && !isspace(line[new_pos - 1])) {
+        new_pos--;
     }
 
-    // Перерисовываем строку
-    printf("\r\033[K"); // Возврат в начало и очистка строки
-    if (*pos > 0) {
-        write(STDOUT_FILENO, line, *pos);
-    }
-    fflush(stdout);
-    
-    // Обновляем буфер
-    line[*pos] = '\0';
+    *pos = new_pos;
+    redraw_line(line, *pos);
 }
 
 int main() {
@@ -81,55 +79,52 @@ int main() {
             break;
         }
 
-        // Backspace
-        if (c == 127 || c == 8) {
-            if (pos > 0) {
-                pos--;
-                col--;
-                printf("\b \b");
-                fflush(stdout);
-                line[pos] = '\0';
-            } else {
-                sound_bell();
-            }
-        }
-        // Ctrl-U - удалить всю строку
-        else if (c == 21) {
-            while (pos > 0) {
-                pos--;
-                col--;
-                printf("\b \b");
-            }
-            fflush(stdout);
-            line[0] = '\0';
-        }
-        // Ctrl-W - удалить последнее слово
-        else if (c == 23) {
-            erase_last_word(line, &pos, &col);
-        }
-        // Печатаемые символы
-        else if (c >= 32 && c <= 126) {
-            if (pos < MAX_LINE) {
-                line[pos++] = c;
-                col++;
-                
-                // Перенос строки при достижении 40 символов
-                if (col >= MAX_LINE) {
-                    printf("\n");
-                    col = 0;
+        switch (c) {
+            case 127: // Backspace
+            case 8:   // Backspace (альтернативный код)
+                if (pos > 0) {
+                    pos--;
+                    col = pos;
+                    redraw_line(line, pos);
+                } else {
+                    sound_bell();
                 }
+                break;
                 
-                write(STDOUT_FILENO, &c, 1);
-                fflush(stdout);
-                line[pos] = '\0';
-            } else {
-                sound_bell();
-            }
+            case 21: // Ctrl-U - удалить всю строку
+                pos = 0;
+                col = 0;
+                redraw_line(line, pos);
+                break;
+                
+            case 23: // Ctrl-W - удалить последнее слово
+                erase_last_word(line, &pos);
+                col = pos;
+                break;
+                
+            default:
+                if (c >= 32 && c <= 126) { // Печатаемые символы
+                    if (pos < MAX_LINE) {
+                        line[pos++] = c;
+                        col = pos;
+                        
+                        // Автоматический перенос
+                        if (col >= MAX_LINE) {
+                            printf("\n");
+                            col = 0;
+                        }
+                        
+                        redraw_line(line, pos);
+                    } else {
+                        sound_bell();
+                    }
+                } else {
+                    sound_bell();
+                }
+                break;
         }
-        // Непечатаемые символы
-        else {
-            sound_bell();
-        }
+        
+        line[pos] = '\0';
     }
 
     return 0;
