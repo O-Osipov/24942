@@ -4,6 +4,7 @@
 
 // ./server & sleep 1 && (echo "Client1" | ./client & echo "Client2" | ./client & echo "Client3" | ./client & wait) && kill %1
 
+
 #include <unistd.h>
 #include <stdio.h>
 #include <ctype.h>

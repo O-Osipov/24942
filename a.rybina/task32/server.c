@@ -4,6 +4,8 @@
 
 // ./server & sleep 1 && (echo "Client1" | ./client & echo "Client2" | ./client & echo "Client3" | ./client & wait) && kill %1
 
+#define _POSIX_C_SOURCE 200112L
+
 #include <unistd.h>
 #include <stdio.h>
 #include <ctype.h>
@@ -14,6 +16,7 @@
 #include <aio.h>
 #include <sys/socket.h>
 #include <sys/un.h>
+#include <time.h>
 
 static const char *socket_path = "./socket30";
 
@@ -28,46 +31,54 @@ typedef struct {
 } client_t;
 
 static client_t clients[MAX_CLIENTS];
-static int num_clients = 0;
+static int active_clients = 0;
 
-static int add_client(int fd) {
-    if (num_clients >= MAX_CLIENTS) {
-        close(fd);
-        return -1;
-    }
-    
-    client_t *client = &clients[num_clients];
-    client->fd = fd;
-    client->active = 1;
-    
+static int start_async_read(client_t *client) {
     memset(&client->aio_read, 0, sizeof(client->aio_read));
-    client->aio_read.aio_fildes = fd;
+    client->aio_read.aio_fildes = client->fd;
     client->aio_read.aio_buf = client->buffer;
     client->aio_read.aio_nbytes = BUFFER_SIZE;
     client->aio_read.aio_offset = 0;
-    
+
     if (aio_read(&client->aio_read) == -1) {
         perror("aio_read");
-        close(fd);
         return -1;
     }
-    
-    num_clients++;
     return 0;
 }
 
+static int add_client(int fd) {
+    for (int i = 0; i < MAX_CLIENTS; ++i) {
+        if (clients[i].active) {
+            continue;
+        }
+
+        client_t *client = &clients[i];
+        client->fd = fd;
+        client->active = 1;
+
+        if (start_async_read(client) == -1) {
+            client->active = 0;
+            close(fd);
+            return -1;
+        }
+
+        active_clients++;
+        return 0;
+    }
+
+    close(fd);
+    return -1;
+}
+
 static void remove_client(int index) {
-    if (index < 0 || index >= num_clients) return;
+    if (index < 0 || index >= MAX_CLIENTS) return;
+    if (!clients[index].active) return;
     
     aio_cancel(clients[index].fd, &clients[index].aio_read);
     close(clients[index].fd);
     clients[index].active = 0;
-    
-    // Move last client to this position
-    if (index < num_clients - 1) {
-        clients[index] = clients[num_clients - 1];
-    }
-    num_clients--;
+    active_clients--;
 }
 
 static ssize_t robust_write(int fd, const void *buf, size_t count) {
@@ -135,7 +146,7 @@ int main(void) {
         }
 
         // Check for completed async reads
-        for (int i = num_clients - 1; i >= 0; --i) {
+        for (int i = 0; i < MAX_CLIENTS; ++i) {
             if (!clients[i].active) continue;
             
             int err = aio_error(&clients[i].aio_read);
@@ -167,51 +178,44 @@ int main(void) {
             }
             
             // Process and output data
-            size_t write_pos = 0;
             for (ssize_t j = 0; j < n; ++j) {
                 unsigned char ch = (unsigned char)clients[i].buffer[j];
-                // Filter out control characters that might trigger commands
-                if (isalnum(ch) || isprint(ch)) {
-                    clients[i].buffer[write_pos] = (char)(isalpha(ch) ? toupper(ch) : ch);
-                    write_pos++;
+                if (isalpha(ch)) {
+                    clients[i].buffer[j] = (char)toupper(ch);
+                } else {
+                    clients[i].buffer[j] = (char)ch;
                 }
             }
-            n = (ssize_t)write_pos;
-            if (n > 0) {
-                if (robust_write(STDOUT_FILENO, clients[i].buffer, (size_t)n) < 0) {
-                    perror("write");
-                }
-                // Add newline after output for next input
-                if (robust_write(STDOUT_FILENO, "\n", 1) < 0) {
-                    perror("write");
-                }
+
+            if (robust_write(STDOUT_FILENO, clients[i].buffer, (size_t)n) < 0) {
+                perror("write");
             }
             
             // Start next async read
-            memset(&clients[i].aio_read, 0, sizeof(clients[i].aio_read));
-            clients[i].aio_read.aio_fildes = clients[i].fd;
-            clients[i].aio_read.aio_buf = clients[i].buffer;
-            clients[i].aio_read.aio_nbytes = BUFFER_SIZE;
-            clients[i].aio_read.aio_offset = 0;
-            
-            if (aio_read(&clients[i].aio_read) == -1) {
-                perror("aio_read");
+            if (start_async_read(&clients[i]) == -1) {
                 remove_client(i);
                 continue;
             }
         }
 
         // Wait for at least one async operation to complete
-        if (num_clients > 0) {
+        if (active_clients > 0) {
             struct aiocb *list[MAX_CLIENTS];
             int count = 0;
-            for (int i = 0; i < num_clients; ++i) {
+            for (int i = 0; i < MAX_CLIENTS; ++i) {
                 if (clients[i].active) {
                     list[count++] = &clients[i].aio_read;
                 }
             }
             if (count > 0) {
-                aio_suspend((const struct aiocb *const *)list, count, NULL);
+                struct timespec timeout;
+                timeout.tv_sec = 0;
+                timeout.tv_nsec = 100000000; // 100ms
+                if (aio_suspend((const struct aiocb *const *)list, count, &timeout) == -1) {
+                    if (errno != EINTR && errno != EAGAIN) {
+                        perror("aio_suspend");
+                    }
+                }
             }
         } else {
             // No clients, sleep briefly before checking for new connections
@@ -220,7 +224,7 @@ int main(void) {
     }
 
     // Cleanup: close all remaining file descriptors
-    for (int i = 0; i < num_clients; ++i) {
+    for (int i = 0; i < MAX_CLIENTS; ++i) {
         if (clients[i].active) {
             aio_cancel(clients[i].fd, &clients[i].aio_read);
             close(clients[i].fd);
