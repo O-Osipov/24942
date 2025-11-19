@@ -1,5 +1,5 @@
 #include <stdio.h> 
-//isprint - возращает true если это ASCII символ
+//isprint - возращает true если это печатаемый ASCII символ
 #include <unistd.h> 
 #include <termios.h>
 #include <ctype.h>
@@ -51,6 +51,15 @@ int main(void) {
             }
             continue;
         }
+                //KILL (Ctrl-U) 
+        if (c == 21) { 
+            while (len > 0) {
+                write(1, "\b \b", 3);
+                len--;
+                col--;
+            }
+            continue;
+        }
         //CTRL-W удаляем последнее слово 
         if (c == 23){
             //удалим пробелы справа
@@ -74,6 +83,7 @@ int main(void) {
                 write(1, "\n", 1);
                 len = 0;
                 col = 0; 
+                line[0] = '\0';    
             }
             //добавляем символ в буфер 
             line[len++] = c; 
