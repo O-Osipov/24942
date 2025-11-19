@@ -7,12 +7,6 @@
 
 #define MAX_LINE 40
 
-// Управляющие символы
-#define ERASE 0x7F  // Backspace (127)
-#define KILL 0x15   // Ctrl-U (21)
-#define CTRL_W 0x17 // Ctrl-W (23)
-#define CTRL_D 0x04 // Ctrl-D (4)
-
 struct termios orig_termios;
 
 void disable_raw_mode() {
@@ -32,18 +26,16 @@ void enable_raw_mode() {
 }
 
 void sound_bell() {
-    write(STDOUT_FILENO, "\x07", 1);
+    printf("\a"); // Простой способ издать звуковой сигнал
+    fflush(stdout);
 }
 
-// Удаляет последнее слово в строке
 void erase_last_word(char *line, int *pos) {
     if (*pos == 0) {
         sound_bell();
         return;
     }
 
-    int end = *pos;
-    
     // Пропускаем пробелы в конце
     while (*pos > 0 && isspace(line[*pos - 1])) {
         (*pos)--;
@@ -54,7 +46,7 @@ void erase_last_word(char *line, int *pos) {
         (*pos)--;
     }
 
-    // Очищаем экран и перерисовываем строку
+    // Перерисовываем строку
     printf("\r\033[K"); // Возврат и очистка строки
     if (*pos > 0) {
         write(STDOUT_FILENO, line, *pos);
@@ -69,20 +61,21 @@ int main() {
     int pos = 0;
     int col = 0;
 
-    printf("Введите текст (Ctrl-D для выхода):\n");
+    printf("Введите текст (Ctrl-D для выхода): ");
+    fflush(stdout);
 
     while (1) {
         char c;
         if (read(STDIN_FILENO, &c, 1) != 1) break;
 
-        // Проверка на Ctrl-D в начале строки
-        if (c == CTRL_D && pos == 0) {
+        // Ctrl-D в начале строки - выход
+        if (c == 4 && pos == 0) { // 4 = Ctrl-D
             printf("\n");
             break;
         }
 
-        // Обработка специальных символов
-        if (c == ERASE) { // Backspace
+        // Backspace (127 или 8)
+        if (c == 127 || c == 8) {
             if (pos > 0) {
                 pos--;
                 col--;
@@ -92,7 +85,8 @@ int main() {
                 sound_bell();
             }
         }
-        else if (c == KILL) { // Удалить всю строку
+        // Ctrl-U - удалить всю строку
+        else if (c == 21) {
             while (pos > 0) {
                 pos--;
                 col--;
@@ -100,11 +94,13 @@ int main() {
             }
             fflush(stdout);
         }
-        else if (c == CTRL_W) { // Удалить последнее слово
+        // Ctrl-W - удалить последнее слово
+        else if (c == 23) {
             erase_last_word(line, &pos);
             col = pos;
         }
-        else if (c >= 32 && c <= 126) { // Печатаемые символы
+        // Печатаемые символы
+        else if (c >= 32 && c <= 126) {
             if (pos < MAX_LINE) {
                 line[pos++] = c;
                 col++;
@@ -121,7 +117,8 @@ int main() {
                 sound_bell();
             }
         }
-        else { // Непечатаемые символы
+        // Непечатаемые символы
+        else {
             sound_bell();
         }
 
