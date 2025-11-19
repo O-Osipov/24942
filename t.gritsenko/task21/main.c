@@ -33,7 +33,7 @@ int main(void) {
     sigaction(SIGQUIT, &sa_quit, NULL);
 
     while (1)
-        pause();
+        pause();o
 
     return 0;
 }
