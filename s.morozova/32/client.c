@@ -32,7 +32,7 @@ int main() {
         exit(EXIT_FAILURE);
     }
     
-    printf("Подключено к серверу (AIO). Введите текст (Ctrl+D для завершения):\n");
+    printf("Подключено к серверу. Введите текст (Ctrl+D для завершения):\n");
     
     // Читаем текст с stdin и отправляем на сервер
     while (fgets(buffer, BUFFER_SIZE, stdin) != NULL) {
