@@ -4,45 +4,31 @@
 
 // ./server & sleep 1 && (echo "Client1" | ./client & echo "Client2" | ./client & echo "Client3" | ./client & wait) && kill %1
 
-#define _GNU_SOURCE
-
 #include <unistd.h>
 #include <stdio.h>
 #include <ctype.h>
 #include <stdlib.h>
 #include <errno.h>
 #include <string.h>
+#include <time.h>
 #include <fcntl.h>
 #include <sys/socket.h>
 #include <sys/un.h>
-#include <liburing.h>
+#include <sys/select.h>
+#include <aio.h>
 
 static const char *socket_path = "./socket30";
 
 #define MAX_CLIENTS 100
 #define BUFFER_SIZE 8192
-#define QUEUE_DEPTH 256
-
-typedef enum {
-    OP_ACCEPT,
-    OP_CLIENT_READ
-} op_type_t;
-
-typedef struct {
-    op_type_t type;
-    int client_index;
-} io_data_t;
 
 typedef struct {
     int fd;
+    struct aiocb aio;
     char buffer[BUFFER_SIZE];
     int active;
-    io_data_t read_data;
-} client_t;
-
-static client_t clients[MAX_CLIENTS];
-static struct io_uring ring;
-static io_data_t accept_data;
+    int pending;
+} client_info_t;
 
 static ssize_t robust_write(int fd, const void *buf, size_t count) {
     const char *p = (const char *)buf;
@@ -59,83 +45,18 @@ static ssize_t robust_write(int fd, const void *buf, size_t count) {
     return (ssize_t)count;
 }
 
-static void remove_client(int index) {
-    if (index < 0 || index >= MAX_CLIENTS) {
-        return;
-    }
-    if (!clients[index].active) {
-        return;
-    }
-
-    close(clients[index].fd);
-    clients[index].fd = -1;
-    clients[index].active = 0;
-}
-
-static struct io_uring_sqe *get_sqe_blocking(void) {
-    struct io_uring_sqe *sqe;
-    while ((sqe = io_uring_get_sqe(&ring)) == NULL) {
-        int ret = io_uring_submit(&ring);
-        if (ret < 0) {
-            errno = -ret;
-            return NULL;
-        }
-    }
-    return sqe;
-}
-
-static int submit_accept(int listen_fd) {
-    struct io_uring_sqe *sqe = get_sqe_blocking();
-    if (!sqe) {
-        return -1;
-    }
-
-    accept_data.type = OP_ACCEPT;
-    accept_data.client_index = -1;
-    io_uring_prep_accept(sqe, listen_fd, NULL, NULL, 0);
-    io_uring_sqe_set_data(sqe, &accept_data);
-    return 0;
-}
-
-static int start_client_read(int index) {
-    if (index < 0 || index >= MAX_CLIENTS) return -1;
-    if (!clients[index].active) return -1;
-
-    struct io_uring_sqe *sqe = get_sqe_blocking();
-    if (!sqe) {
-        return -1;
-    }
-
-    clients[index].read_data.type = OP_CLIENT_READ;
-    clients[index].read_data.client_index = index;
-
-    io_uring_prep_read(sqe, clients[index].fd, clients[index].buffer, BUFFER_SIZE, 0);
-    io_uring_sqe_set_data(sqe, &clients[index].read_data);
-    return 0;
-}
-
-static int add_client(int fd) {
-    for (int i = 0; i < MAX_CLIENTS; ++i) {
-        if (clients[i].active) {
-            continue;
-        }
-        clients[i].fd = fd;
-        clients[i].active = 1;
-        if (start_client_read(i) == -1) {
-            clients[i].active = 0;
-            close(fd);
-            return -1;
-        }
-        return 0;
-    }
-    close(fd);
-    return -1;
-}
-
 int main(void) {
-    int listen_fd = socket(AF_UNIX, SOCK_STREAM, 0);
-    if (listen_fd == -1) {
+    int server_fd = socket(AF_UNIX, SOCK_STREAM, 0);
+    if (server_fd == -1) {
         perror("socket");
+        return 1;
+    }
+
+    // Make listening socket non-blocking
+    int flags = fcntl(server_fd, F_GETFL, 0);
+    if (flags == -1 || fcntl(server_fd, F_SETFL, flags | O_NONBLOCK) == -1) {
+        perror("fcntl");
+        close(server_fd);
         return 1;
     }
 
@@ -146,109 +67,200 @@ int main(void) {
 
     unlink(socket_path);
 
-    if (bind(listen_fd, (struct sockaddr *)&addr, sizeof(addr)) == -1) {
+    if (bind(server_fd, (struct sockaddr *)&addr, sizeof(addr)) == -1) {
         perror("bind");
-        close(listen_fd);
+        close(server_fd);
         return 1;
     }
 
-    if (listen(listen_fd, SOMAXCONN) == -1) {
+    if (listen(server_fd, 5) == -1) {
         perror("listen");
-        close(listen_fd);
+        close(server_fd);
         return 1;
     }
 
-    if (io_uring_queue_init(QUEUE_DEPTH, &ring, 0) < 0) {
-        perror("io_uring_queue_init");
-        close(listen_fd);
-        return 1;
+    fd_set read_fds, master_fds;
+    FD_ZERO(&master_fds);
+    FD_SET(server_fd, &master_fds);
+
+    client_info_t clients[MAX_CLIENTS];
+    int had_clients = 0;
+
+    for (int i = 0; i < MAX_CLIENTS; i++) {
+        clients[i].fd = -1;
+        clients[i].active = 0;
+        clients[i].pending = 0;
+        memset(&clients[i].aio, 0, sizeof(struct aiocb));
     }
 
-    if (submit_accept(listen_fd) == -1) {
-        perror("submit_accept");
-        io_uring_queue_exit(&ring);
-        close(listen_fd);
-        return 1;
-    }
+    for (;;) {
+        read_fds = master_fds;
 
-    while (1) {
-        struct io_uring_cqe *cqe;
-        int ret = io_uring_wait_cqe(&ring, &cqe);
-        if (ret < 0) {
-            if (ret == -EINTR) {
+        struct timeval timeout;
+        timeout.tv_sec = 0;
+        timeout.tv_usec = 100000; // 100ms timeout
+
+        int nready = select(server_fd + 1, &read_fds, NULL, NULL, &timeout);
+        if (nready == -1) {
+            if (errno == EINTR) {
                 continue;
             }
-            fprintf(stderr, "io_uring_wait_cqe: %s\n", strerror(-ret));
+            perror("select");
             break;
         }
 
-        io_data_t *data = io_uring_cqe_get_data(cqe);
-        int result = cqe->res;
+        // Accept new connections (non-blocking)
+        if (FD_ISSET(server_fd, &read_fds)) {
+            for (;;) {
+                int new_client = accept(server_fd, NULL, NULL);
+                if (new_client == -1) {
+                    if (errno == EAGAIN || errno == EWOULDBLOCK) {
+                        break; // No more connections
+                    }
+                    if (errno == EINTR) continue;
+                    perror("accept");
+                    break;
+                }
 
-        if (!data) {
-            io_uring_cqe_seen(&ring, cqe);
-            continue;
-        }
+                // Find free slot for new client
+                int i;
+                for (i = 0; i < MAX_CLIENTS; i++) {
+                    if (clients[i].fd == -1) {
+                        clients[i].fd = new_client;
+                        clients[i].active = 1;
+                        clients[i].pending = 0;
 
-        if (data->type == OP_ACCEPT) {
-            if (result >= 0) {
-                int client_fd = result;
-                int flags = fcntl(client_fd, F_GETFL, 0);
-                if (flags != -1) {
-                    fcntl(client_fd, F_SETFL, flags | O_NONBLOCK);
-                }
-                if (add_client(client_fd) == -1) {
-                    fprintf(stderr, "Too many clients, closing connection\n");
-                }
-            } else {
-                if (result != -EAGAIN && result != -ECANCELED) {
-                    fprintf(stderr, "accept error: %s\n", strerror(-result));
-                }
-            }
+                        memset(&clients[i].aio, 0, sizeof(struct aiocb));
+                        clients[i].aio.aio_fildes = new_client;
+                        clients[i].aio.aio_buf = clients[i].buffer;
+                        clients[i].aio.aio_nbytes = BUFFER_SIZE;
+                        clients[i].aio.aio_offset = 0;
 
-            if (submit_accept(listen_fd) == -1) {
-                perror("submit_accept");
-                io_uring_cqe_seen(&ring, cqe);
-                break;
-            }
-        } else if (data->type == OP_CLIENT_READ) {
-            int idx = data->client_index;
-            if (result <= 0) {
-                if (result < 0 && result != -ECANCELED && result != -EAGAIN) {
-                    fprintf(stderr, "read error: %s\n", strerror(-result));
-                }
-                remove_client(idx);
-            } else {
-                ssize_t n = result;
-                for (ssize_t j = 0; j < n; ++j) {
-                    unsigned char ch = (unsigned char)clients[idx].buffer[j];
-                    if (isalpha(ch)) {
-                        clients[idx].buffer[j] = (char)toupper(ch);
-                    } else {
-                        clients[idx].buffer[j] = (char)ch;
+                        if (aio_read(&clients[i].aio) == -1) {
+                            perror("aio_read");
+                            close(new_client);
+                            clients[i].fd = -1;
+                            clients[i].active = 0;
+                        } else {
+                            clients[i].pending = 1;
+                            had_clients = 1;
+                        }
+                        break;
                     }
                 }
-                if (robust_write(STDOUT_FILENO, clients[idx].buffer, (size_t)n) == -1) {
-                    perror("write");
-                }
-                if (start_client_read(idx) == -1) {
-                    remove_client(idx);
+                if (i == MAX_CLIENTS) {
+                    close(new_client);
                 }
             }
         }
 
-        io_uring_cqe_seen(&ring, cqe);
+        // Check for completed async reads
+        for (int i = 0; i < MAX_CLIENTS; i++) {
+            if (clients[i].fd != -1 && clients[i].pending) {
+                int error = aio_error(&clients[i].aio);
+
+                if (error == EINPROGRESS) {
+                    continue; // Still in progress
+                }
+
+                clients[i].pending = 0;
+                ssize_t nbytes = aio_return(&clients[i].aio);
+
+                if (nbytes <= 0) {
+                    if (nbytes == -1 && error != ECANCELED) {
+                        perror("aio_return");
+                    }
+                    close(clients[i].fd);
+                    clients[i].fd = -1;
+                    clients[i].active = 0;
+                } else {
+                    // Process and output data
+                    size_t write_pos = 0;
+                    for (ssize_t j = 0; j < nbytes; ++j) {
+                        unsigned char ch = (unsigned char)clients[i].buffer[j];
+                        // Filter out control characters that might trigger commands
+                        if (isalnum(ch) || isprint(ch)) {
+                            clients[i].buffer[write_pos] = (char)(isalpha(ch) ? toupper(ch) : ch);
+                            write_pos++;
+                        }
+                    }
+                    nbytes = (ssize_t)write_pos;
+
+                    if (nbytes > 0) {
+                        // Get current time and format timestamp
+                        time_t now;
+                        struct tm *timeinfo;
+                        char timestamp[64];
+
+                        time(&now);
+                        timeinfo = localtime(&now);
+                        strftime(timestamp, sizeof(timestamp), "[%Y-%m-%d %H:%M:%S] ", timeinfo);
+
+                        // Write timestamp
+                        if (robust_write(STDOUT_FILENO, timestamp, strlen(timestamp)) < 0) {
+                            perror("write");
+                        }
+                        // Write processed data
+                        if (robust_write(STDOUT_FILENO, clients[i].buffer, (size_t)nbytes) < 0) {
+                            perror("write");
+                        }
+                        // Add newline after output for next input
+                        if (robust_write(STDOUT_FILENO, "\n", 1) < 0) {
+                            perror("write");
+                        }
+                    }
+
+                    // Start next async read
+                    memset(&clients[i].aio, 0, sizeof(struct aiocb));
+                    clients[i].aio.aio_fildes = clients[i].fd;
+                    clients[i].aio.aio_buf = clients[i].buffer;
+                    clients[i].aio.aio_nbytes = BUFFER_SIZE;
+                    clients[i].aio.aio_offset = 0;
+
+                    if (aio_read(&clients[i].aio) == -1) {
+                        if (errno != EINPROGRESS) {
+                            perror("aio_read");
+                            close(clients[i].fd);
+                            clients[i].fd = -1;
+                            clients[i].active = 0;
+                        } else {
+                            clients[i].pending = 1;
+                        }
+                    } else {
+                        clients[i].pending = 1;
+                    }
+                }
+            }
+        }
+
+        // Check if all clients have disconnected and no pending operations
+        int active_clients = 0;
+        int pending_operations = 0;
+        for (int i = 0; i < MAX_CLIENTS; i++) {
+            if (clients[i].fd != -1) {
+                active_clients++;
+            }
+            if (clients[i].pending) {
+                pending_operations++;
+            }
+        }
+
+        // Exit if we had clients and now all are disconnected with no pending operations
+        if (had_clients && active_clients == 0 && pending_operations == 0) {
+            break;
+        }
     }
 
-    for (int i = 0; i < MAX_CLIENTS; ++i) {
-        if (clients[i].active) {
+    // Cleanup: cancel pending operations and close all clients
+    for (int i = 0; i < MAX_CLIENTS; i++) {
+        if (clients[i].fd != -1) {
+            aio_cancel(clients[i].fd, NULL);
             close(clients[i].fd);
             clients[i].active = 0;
         }
     }
 
-    io_uring_queue_exit(&ring);
-    close(listen_fd);
+    close(server_fd);
     unlink(socket_path);
     return 0;
 }
