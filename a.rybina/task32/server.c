@@ -97,16 +97,41 @@ int main(void) {
     for (;;) {
         read_fds = master_fds;
 
-        struct timeval timeout;
-        timeout.tv_sec = 0;
-        timeout.tv_usec = 100000; // 100ms timeout
+        // Check if we had clients and all disconnected
+        int active_before = 0;
+        int pending_before = 0;
+        for (int i = 0; i < MAX_CLIENTS; i++) {
+            if (clients[i].fd != -1) {
+                active_before++;
+            }
+            if (clients[i].pending) {
+                pending_before++;
+            }
+        }
 
-        int nready = select(server_fd + 1, &read_fds, NULL, NULL, &timeout);
+        struct timeval timeout;
+        struct timeval *timeout_ptr = NULL;
+        
+        // If we had clients and all disconnected with no pending operations, use timeout
+        if (had_clients && active_before == 0 && pending_before == 0) {
+            timeout.tv_sec = 0;
+            timeout.tv_usec = 200000; // 200ms timeout
+            timeout_ptr = &timeout;
+        } else {
+            timeout_ptr = NULL; // Block indefinitely
+        }
+
+        int nready = select(server_fd + 1, &read_fds, NULL, NULL, timeout_ptr);
         if (nready == -1) {
             if (errno == EINTR) {
                 continue;
             }
             perror("select");
+            break;
+        }
+        
+        // If timeout occurred and we had clients but all disconnected, exit
+        if (nready == 0 && had_clients && active_before == 0 && pending_before == 0) {
             break;
         }
 
@@ -233,23 +258,6 @@ int main(void) {
                     }
                 }
             }
-        }
-
-        // Check if all clients have disconnected and no pending operations
-        int active_clients = 0;
-        int pending_operations = 0;
-        for (int i = 0; i < MAX_CLIENTS; i++) {
-            if (clients[i].fd != -1) {
-                active_clients++;
-            }
-            if (clients[i].pending) {
-                pending_operations++;
-            }
-        }
-
-        // Exit if we had clients and now all are disconnected with no pending operations
-        if (had_clients && active_clients == 0 && pending_operations == 0) {
-            break;
         }
     }
 

@@ -76,13 +76,37 @@ int main(void) {
 
     int had_clients = 0;
     char buffer[8192];
+    struct timeval timeout;
+    struct timeval *timeout_ptr = NULL;
+    
     for (;;) {
         read_fds = all_fds;
 
-        int nready = select(max_fd + 1, &read_fds, NULL, NULL, NULL);
+        // If we had clients and all disconnected, use timeout to wait for new connections
+        int active_before = 0;
+        for (int fd = listen_fd + 1; fd <= max_fd; ++fd) {
+            if (FD_ISSET(fd, &all_fds)) {
+                active_before++;
+            }
+        }
+        
+        if (had_clients && active_before == 0) {
+            timeout.tv_sec = 0;
+            timeout.tv_usec = 200000; // 200ms timeout
+            timeout_ptr = &timeout;
+        } else {
+            timeout_ptr = NULL; // Block indefinitely
+        }
+
+        int nready = select(max_fd + 1, &read_fds, NULL, NULL, timeout_ptr);
         if (nready == -1) {
             if (errno == EINTR) continue;
             perror("select");
+            break;
+        }
+        
+        // If timeout occurred and we had clients but all disconnected, exit
+        if (nready == 0 && had_clients && active_before == 0) {
             break;
         }
 
@@ -163,19 +187,6 @@ int main(void) {
                     }
                 }
             }
-        }
-
-        // Check if all clients have disconnected
-        int active_clients = 0;
-        for (int fd = listen_fd + 1; fd <= max_fd; ++fd) {
-            if (FD_ISSET(fd, &all_fds)) {
-                active_clients++;
-            }
-        }
-
-        // Exit if we had clients and now all are disconnected
-        if (had_clients && active_clients == 0) {
-            break;
         }
     }
 
