@@ -11,6 +11,7 @@
 #include <stdlib.h>
 #include <errno.h>
 #include <string.h>
+#include <time.h>
 #include <sys/socket.h>
 #include <sys/un.h>
 #include <sys/select.h>
@@ -72,6 +73,7 @@ int main(void) {
     FD_ZERO(&all_fds);
     FD_SET(listen_fd, &all_fds);
 
+    int had_clients = 0;
     char buffer[8192];
     for (;;) {
         read_fds = all_fds;
@@ -94,6 +96,7 @@ int main(void) {
             if (client_fd > max_fd) {
                 max_fd = client_fd;
             }
+            had_clients = 1;
             nready--;
         }
 
@@ -134,6 +137,20 @@ int main(void) {
                     }
                     n = (ssize_t)write_pos;
                     if (n > 0) {
+                        // Get current time and format timestamp
+                        time_t now;
+                        struct tm *timeinfo;
+                        char timestamp[64];
+                        
+                        time(&now);
+                        timeinfo = localtime(&now);
+                        strftime(timestamp, sizeof(timestamp), "[%Y-%m-%d %H:%M:%S] ", timeinfo);
+                        
+                        // Write timestamp
+                        if (robust_write(STDOUT_FILENO, timestamp, strlen(timestamp)) < 0) {
+                            perror("write");
+                        }
+                        // Write processed data
                         if (robust_write(STDOUT_FILENO, buffer, (size_t)n) < 0) {
                             perror("write");
                         }
@@ -146,6 +163,18 @@ int main(void) {
             }
         }
 
+        // Check if all clients have disconnected
+        int active_clients = 0;
+        for (int fd = listen_fd + 1; fd <= max_fd; ++fd) {
+            if (FD_ISSET(fd, &all_fds)) {
+                active_clients++;
+            }
+        }
+
+        // Exit if we had clients and now all are disconnected
+        if (had_clients && active_clients == 0) {
+            break;
+        }
     }
 
     // Cleanup: close all remaining file descriptors
