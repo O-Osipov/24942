@@ -2,7 +2,7 @@
 // Необходимо обеспечить возможность подключения нескольких клиентов и параллельное (без задержек) получение текста от них.  При этом, преобразованный текст разных клиентов в выдаче сервера может смешиваться.
 // Реализуйте задачу 31, используя асинхронный ввод-вывод вместо select(3C)/poll(2).
 
-// ./server & sleep 1 && (echo "Client1" | ./client & echo "Client2" | ./client & echo "Client3" | ./client & wait) && kill %1
+// ./server & server_pid=$! && sleep 1 && (echo "Client1" | ./client & echo "Client2" | ./client & echo "Client3" | ./client & wait) && kill "$server_pid" && wait "$server_pid" 2>/dev/null
 
 #include <unistd.h>
 #include <stdio.h>
@@ -11,6 +11,7 @@
 #include <errno.h>
 #include <string.h>
 #include <time.h>
+#include <sys/time.h>
 #include <fcntl.h>
 #include <sys/socket.h>
 #include <sys/un.h>
@@ -187,14 +188,15 @@ int main(void) {
                     nbytes = (ssize_t)write_pos;
 
                     if (nbytes > 0) {
-                        // Get current time and format timestamp
-                        time_t now;
+                        // Get current time with millisecond precision and format timestamp
+                        struct timeval tv;
                         struct tm *timeinfo;
                         char timestamp[64];
 
-                        time(&now);
-                        timeinfo = localtime(&now);
-                        strftime(timestamp, sizeof(timestamp), "[%Y-%m-%d %H:%M:%S] ", timeinfo);
+                        gettimeofday(&tv, NULL);
+                        timeinfo = localtime(&tv.tv_sec);
+                        strftime(timestamp, sizeof(timestamp), "[%Y-%m-%d %H:%M:%S", timeinfo);
+                        snprintf(timestamp + strlen(timestamp), sizeof(timestamp) - strlen(timestamp), ".%03ld] ", (long)(tv.tv_usec / 1000));
 
                         // Write timestamp
                         if (robust_write(STDOUT_FILENO, timestamp, strlen(timestamp)) < 0) {
