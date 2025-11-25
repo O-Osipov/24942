@@ -151,7 +151,9 @@ int main(void) {
                     }
                 } else {
                     // Process and output data
+                    struct timespec start_time, end_time;
                     size_t write_pos = 0;
+                    clock_gettime(CLOCK_MONOTONIC, &start_time);
                     for (ssize_t i = 0; i < n; ++i) {
                         unsigned char ch = (unsigned char)buffer[i];
                         // Filter out control characters that might trigger commands
@@ -162,6 +164,14 @@ int main(void) {
                     }
                     n = (ssize_t)write_pos;
                     if (n > 0) {
+                        clock_gettime(CLOCK_MONOTONIC, &end_time);
+                        long processing_us =
+                            (end_time.tv_sec - start_time.tv_sec) * 1000000L +
+                            (end_time.tv_nsec - start_time.tv_nsec) / 1000L;
+                        char processing_info[64];
+                        snprintf(processing_info, sizeof(processing_info),
+                                 "[Processing time: %ld us] ", processing_us);
+
                         // Get current time with millisecond precision and format timestamp
                         struct timeval tv;
                         struct tm *timeinfo;
@@ -174,6 +184,10 @@ int main(void) {
                         
                         // Write timestamp
                         if (robust_write(STDOUT_FILENO, timestamp, strlen(timestamp)) < 0) {
+                            perror("write");
+                        }
+                        // Write processing info
+                        if (robust_write(STDOUT_FILENO, processing_info, strlen(processing_info)) < 0) {
                             perror("write");
                         }
                         // Write processed data
