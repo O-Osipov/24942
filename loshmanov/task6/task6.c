@@ -43,6 +43,18 @@ void printLine(Line line, int fd) {
     free(buf);
 }
 
+/* === ПЕЧАТЬ ТАБЛИЦЫ offset/length === */
+static void print_table(const Array *t) {
+    printf("TABLE (line  offset  length)\n");
+    for (int i = 0; i < t->cnt; ++i) {
+        printf("%5d  %6lld  %6lld\n",
+               i + 1,
+               (long long)t->array[i].offset,
+               (long long)t->array[i].length);
+    }
+    printf("Total lines: %d\n\n", t->cnt);
+}
+
 int main(int argc, char *argv[]) {
     if (argc != 2) return 1;
     char *path = argv[1];
@@ -70,6 +82,9 @@ int main(int argc, char *argv[]) {
         Line current = (Line){lineOffset, lineLength};
         insertArray(&table, current);
     }
+
+    /* Печатаем таблицу сразу после построения */
+    print_table(&table);
 
     int first_prompt = 1;
     char ibuf[64];
