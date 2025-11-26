@@ -156,6 +156,14 @@ int main(void) {
                 int i;
                 for (i = 0; i < MAX_CLIENTS; i++) {
                     if (clients[i].fd == -1) {
+                        // Make client socket non-blocking for async I/O
+                        int flags = fcntl(new_client, F_GETFL, 0);
+                        if (flags == -1 || fcntl(new_client, F_SETFL, flags | O_NONBLOCK) == -1) {
+                            perror("fcntl client");
+                            close(new_client);
+                            continue;
+                        }
+
                         clients[i].fd = new_client;
                         clients[i].active = 1;
                         clients[i].pending = 0;
@@ -189,7 +197,8 @@ int main(void) {
             if (clients[i].fd != -1 && clients[i].pending) {
                 int error = aio_error(&clients[i].aio);
 
-                if (error == EINPROGRESS) {
+                // EINPROGRESS or EAGAIN means operation still in progress
+                if (error == EINPROGRESS || error == EAGAIN) {
                     continue; // Still in progress
                 }
 
