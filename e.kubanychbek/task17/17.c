@@ -34,6 +34,13 @@ int main(void) {
                 len--;
                 col--;
                 write(1, "\b \b", 3); //удаление символа на терминале 
+            if (len == 0){
+                write(1, "\033[A", 3);
+                while (len != 40){
+                    write(1, "\033[C", 3);
+                    len += 1;
+                }
+                }
             }
             continue;
         }
