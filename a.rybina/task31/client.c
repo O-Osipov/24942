@@ -1,21 +1,15 @@
+#define _POSIX_C_SOURCE 200809L
+
 #include <unistd.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <errno.h>
 #include <string.h>
+#include <time.h>
 #include <sys/socket.h>
 #include <sys/un.h>
 
 static const char *socket_path = "./socket30";
-
-static ssize_t robust_read(int fd, void *buf, size_t count) {
-    for (;;) {
-        ssize_t n = read(fd, buf, count);
-        if (n >= 0) return n;
-        if (errno == EINTR) continue;
-        return -1;
-    }
-}
 
 static ssize_t robust_write(int fd, const void *buf, size_t count) {
     const char *p = (const char *)buf;
@@ -50,20 +44,33 @@ int main(void) {
         return 1;
     }
 
-    char buffer[8192];
-    for (;;) {
-        ssize_t n = robust_read(STDIN_FILENO, buffer, sizeof(buffer));
-        if (n == 0) break;
-        if (n < 0) {
-            perror("read");
-            close(fd);
-            return 1;
+    const char *message = "hello\n";
+    size_t message_len = strlen(message);
+    struct timespec start_time, current_time;
+
+    clock_gettime(CLOCK_MONOTONIC, &start_time);
+
+    while (1) {
+        clock_gettime(CLOCK_MONOTONIC, &current_time);
+
+        // Check if 2 seconds have elapsed
+        long elapsed_ms = (current_time.tv_sec - start_time.tv_sec) * 1000L +
+                         (current_time.tv_nsec - start_time.tv_nsec) / 1000000L;
+        if (elapsed_ms >= 2000) {
+            break;
         }
-        if (robust_write(fd, buffer, (size_t)n) < 0) {
+
+        ssize_t bytes_written = robust_write(fd, message, message_len);
+        if (bytes_written < 0) {
             perror("write");
             close(fd);
             return 1;
         }
+        if ((size_t)bytes_written != message_len) {
+            fprintf(stderr, "Partial write: wrote %zd of %zu bytes\n", bytes_written, message_len);
+        }
+
+        usleep(10000); // Sleep for 10 ms
     }
 
     close(fd);
