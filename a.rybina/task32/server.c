@@ -4,6 +4,8 @@
 
 // ./server & server_pid=$! && sleep 1 && (echo "Client1" | ./client & echo "Client2" | ./client & echo "Client3" | ./client & wait) && kill "$server_pid" && wait "$server_pid" 2>/dev/null
 
+#define _POSIX_C_SOURCE 200809L
+
 #include <unistd.h>
 #include <stdio.h>
 #include <ctype.h>
@@ -192,10 +194,24 @@ int main(void) {
                 }
 
                 clients[i].pending = 0;
+                
+                // Only call aio_return if operation completed successfully (error == 0)
+                if (error != 0) {
+                    // Operation failed
+                    if (error != ECANCELED) {
+                        errno = error;
+                        perror("aio_error");
+                    }
+                    close(clients[i].fd);
+                    clients[i].fd = -1;
+                    clients[i].active = 0;
+                    continue;
+                }
+
                 ssize_t nbytes = aio_return(&clients[i].aio);
 
                 if (nbytes <= 0) {
-                    if (nbytes == -1 && error != ECANCELED) {
+                    if (nbytes == -1) {
                         perror("aio_return");
                     }
                     close(clients[i].fd);

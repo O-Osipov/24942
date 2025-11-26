@@ -4,6 +4,7 @@
 
 // ./server & server_pid=$! && sleep 1 && (echo "Client1" | ./client & echo "Client2" | ./client & echo "Client3" | ./client & wait) && kill "$server_pid" && wait "$server_pid" 2>/dev/null
 
+#define _POSIX_C_SOURCE 200809L
 
 #include <unistd.h>
 #include <stdio.h>
