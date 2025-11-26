@@ -1,3 +1,5 @@
+#define _POSIX_C_SOURCE 200809L
+
 #include <unistd.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -8,15 +10,6 @@
 #include <sys/un.h>
 
 static const char *socket_path = "./socket30";
-
-static ssize_t robust_read(int fd, void *buf, size_t count) {
-    for (;;) {
-        ssize_t n = read(fd, buf, count);
-        if (n >= 0) return n;
-        if (errno == EINTR) continue;
-        return -1;
-    }
-}
 
 static ssize_t robust_write(int fd, const void *buf, size_t count) {
     const char *p = (const char *)buf;
