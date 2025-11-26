@@ -9,7 +9,7 @@
 #include <sys/socket.h>
 #include <sys/un.h>
 
-static const char *socket_path = "./socket30";
+static const char *socket_path = "/tmp/server_socket";
 
 static ssize_t robust_write(int fd, const void *buf, size_t count) {
     const char *p = (const char *)buf;

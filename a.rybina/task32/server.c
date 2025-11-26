@@ -14,13 +14,12 @@
 #include <string.h>
 #include <time.h>
 #include <sys/time.h>
-#include <fcntl.h>
 #include <sys/socket.h>
 #include <sys/un.h>
 #include <sys/select.h>
 #include <aio.h>
 
-static const char *socket_path = "./socket30";
+static const char *socket_path = "/tmp/server_socket";
 
 #define MAX_CLIENTS 100
 #define BUFFER_SIZE 8192
@@ -55,20 +54,12 @@ int main(void) {
         return 1;
     }
 
-    // Make listening socket non-blocking
-    int flags = fcntl(server_fd, F_GETFL, 0);
-    if (flags == -1 || fcntl(server_fd, F_SETFL, flags | O_NONBLOCK) == -1) {
-        perror("fcntl");
-        close(server_fd);
-        return 1;
-    }
+    unlink(socket_path);
 
     struct sockaddr_un addr;
     memset(&addr, 0, sizeof(addr));
     addr.sun_family = AF_UNIX;
     strncpy(addr.sun_path, socket_path, sizeof(addr.sun_path) - 1);
-
-    unlink(socket_path);
 
     if (bind(server_fd, (struct sockaddr *)&addr, sizeof(addr)) == -1) {
         perror("bind");
@@ -96,74 +87,28 @@ int main(void) {
         memset(&clients[i].aio, 0, sizeof(struct aiocb));
     }
 
-    for (;;) {
+    while (1) {
         read_fds = master_fds;
+        struct timeval timeout = { .tv_sec = 0, .tv_usec = 100000 }; // 100 ms like reference
 
-        // Check if we had clients and all disconnected
-        int active_before = 0;
-        int pending_before = 0;
-        for (int i = 0; i < MAX_CLIENTS; i++) {
-            if (clients[i].fd != -1) {
-                active_before++;
-            }
-            if (clients[i].pending) {
-                pending_before++;
-            }
-        }
-
-        struct timeval timeout;
-        struct timeval *timeout_ptr;
-        
-        // Always use a timeout to periodically check async operations
-        // Use longer timeout if all clients disconnected, shorter if active
-        if (had_clients && active_before == 0 && pending_before == 0) {
-            timeout.tv_sec = 0;
-            timeout.tv_usec = 200000; // 200ms timeout when all disconnected
-        } else {
-            timeout.tv_sec = 0;
-            timeout.tv_usec = 100000; // 100ms timeout to check async operations
-        }
-        timeout_ptr = &timeout;
-
-        int nready = select(server_fd + 1, &read_fds, NULL, NULL, timeout_ptr);
-        if (nready == -1) {
+        if (select(server_fd + 1, &read_fds, NULL, NULL, &timeout) == -1) {
             if (errno == EINTR) {
                 continue;
             }
             perror("select");
             break;
         }
-        
-        // If timeout occurred and we had clients but all disconnected, exit
-        if (nready == 0 && had_clients && active_before == 0 && pending_before == 0) {
-            break;
-        }
 
-        // Accept new connections (non-blocking)
         if (FD_ISSET(server_fd, &read_fds)) {
-            for (;;) {
-                int new_client = accept(server_fd, NULL, NULL);
-                if (new_client == -1) {
-                    if (errno == EAGAIN || errno == EWOULDBLOCK) {
-                        break; // No more connections
-                    }
-                    if (errno == EINTR) continue;
-                    perror("accept");
-                    break;
-                }
-
-                // Find free slot for new client
-                int i;
-                for (i = 0; i < MAX_CLIENTS; i++) {
+            struct sockaddr_un client_addr;
+            socklen_t client_len = sizeof(client_addr);
+            int new_client = accept(server_fd, (struct sockaddr *)&client_addr, &client_len);
+            if (new_client == -1) {
+                perror("accept");
+            } else {
+                int placed = 0;
+                for (int i = 0; i < MAX_CLIENTS; i++) {
                     if (clients[i].fd == -1) {
-                        // Make client socket non-blocking for async I/O
-                        int flags = fcntl(new_client, F_GETFL, 0);
-                        if (flags == -1 || fcntl(new_client, F_SETFL, flags | O_NONBLOCK) == -1) {
-                            perror("fcntl client");
-                            close(new_client);
-                            continue;
-                        }
-
                         clients[i].fd = new_client;
                         clients[i].active = 1;
                         clients[i].pending = 0;
@@ -171,7 +116,7 @@ int main(void) {
                         memset(&clients[i].aio, 0, sizeof(struct aiocb));
                         clients[i].aio.aio_fildes = new_client;
                         clients[i].aio.aio_buf = clients[i].buffer;
-                        clients[i].aio.aio_nbytes = BUFFER_SIZE;
+                        clients[i].aio.aio_nbytes = BUFFER_SIZE - 1;
                         clients[i].aio.aio_offset = 0;
 
                         if (aio_read(&clients[i].aio) == -1) {
@@ -183,30 +128,27 @@ int main(void) {
                             clients[i].pending = 1;
                             had_clients = 1;
                         }
+                        placed = 1;
                         break;
                     }
                 }
-                if (i == MAX_CLIENTS) {
+                if (!placed) {
                     close(new_client);
                 }
             }
         }
 
-        // Check for completed async reads
         for (int i = 0; i < MAX_CLIENTS; i++) {
             if (clients[i].fd != -1 && clients[i].pending) {
                 int error = aio_error(&clients[i].aio);
 
-                // EINPROGRESS or EAGAIN means operation still in progress
-                if (error == EINPROGRESS || error == EAGAIN) {
-                    continue; // Still in progress
+                if (error == EINPROGRESS) {
+                    continue;
                 }
 
                 clients[i].pending = 0;
-                
-                // Only call aio_return if operation completed successfully (error == 0)
+
                 if (error != 0) {
-                    // Operation failed
                     if (error != ECANCELED) {
                         errno = error;
                         perror("aio_error");
@@ -218,7 +160,6 @@ int main(void) {
                 }
 
                 ssize_t nbytes = aio_return(&clients[i].aio);
-
                 if (nbytes <= 0) {
                     if (nbytes == -1) {
                         perror("aio_return");
@@ -227,16 +168,15 @@ int main(void) {
                     clients[i].fd = -1;
                     clients[i].active = 0;
                 } else {
-                    // Measure processing time and output data
                     struct timespec start_time, end_time;
-                    size_t write_pos = 0;
                     clock_gettime(CLOCK_MONOTONIC, &start_time);
+
+                    clients[i].buffer[nbytes] = '\0';
+                    size_t write_pos = 0;
                     for (ssize_t j = 0; j < nbytes; ++j) {
                         unsigned char ch = (unsigned char)clients[i].buffer[j];
-                        // Filter out control characters that might trigger commands
                         if (isalnum(ch) || isprint(ch)) {
-                            clients[i].buffer[write_pos] = (char)(isalpha(ch) ? toupper(ch) : ch);
-                            write_pos++;
+                            clients[i].buffer[write_pos++] = (char)(isalpha(ch) ? toupper(ch) : ch);
                         }
                     }
                     nbytes = (ssize_t)write_pos;
@@ -250,39 +190,33 @@ int main(void) {
                         snprintf(processing_info, sizeof(processing_info),
                                  "[Processing time: %ld us] ", processing_us);
 
-                        // Get current time with millisecond precision and format timestamp
                         struct timeval tv;
                         struct tm *timeinfo;
                         char timestamp[64];
-
                         gettimeofday(&tv, NULL);
                         timeinfo = localtime(&tv.tv_sec);
                         strftime(timestamp, sizeof(timestamp), "[%Y-%m-%d %H:%M:%S", timeinfo);
-                        snprintf(timestamp + strlen(timestamp), sizeof(timestamp) - strlen(timestamp), ".%03ld] ", (long)(tv.tv_usec / 1000));
+                        snprintf(timestamp + strlen(timestamp), sizeof(timestamp) - strlen(timestamp),
+                                 ".%03ld] ", (long)(tv.tv_usec / 1000));
 
-                        // Write timestamp
                         if (robust_write(STDOUT_FILENO, timestamp, strlen(timestamp)) < 0) {
                             perror("write");
                         }
-                        // Write processing info
                         if (robust_write(STDOUT_FILENO, processing_info, strlen(processing_info)) < 0) {
                             perror("write");
                         }
-                        // Write processed data
                         if (robust_write(STDOUT_FILENO, clients[i].buffer, (size_t)nbytes) < 0) {
                             perror("write");
                         }
-                        // Add newline after output for next input
                         if (robust_write(STDOUT_FILENO, "\n", 1) < 0) {
                             perror("write");
                         }
                     }
 
-                    // Start next async read
                     memset(&clients[i].aio, 0, sizeof(struct aiocb));
                     clients[i].aio.aio_fildes = clients[i].fd;
                     clients[i].aio.aio_buf = clients[i].buffer;
-                    clients[i].aio.aio_nbytes = BUFFER_SIZE;
+                    clients[i].aio.aio_nbytes = BUFFER_SIZE - 1;
                     clients[i].aio.aio_offset = 0;
 
                     if (aio_read(&clients[i].aio) == -1) {
@@ -300,14 +234,27 @@ int main(void) {
                 }
             }
         }
+
+        int active_clients = 0;
+        int pending_ops = 0;
+        for (int i = 0; i < MAX_CLIENTS; i++) {
+            if (clients[i].fd != -1) {
+                active_clients++;
+            }
+            if (clients[i].pending) {
+                pending_ops++;
+            }
+        }
+
+        if (had_clients && active_clients == 0 && pending_ops == 0) {
+            break;
+        }
     }
 
-    // Cleanup: cancel pending operations and close all clients
     for (int i = 0; i < MAX_CLIENTS; i++) {
         if (clients[i].fd != -1) {
             aio_cancel(clients[i].fd, NULL);
             close(clients[i].fd);
-            clients[i].active = 0;
         }
     }
 
