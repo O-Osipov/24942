@@ -110,16 +110,18 @@ int main(void) {
         }
 
         struct timeval timeout;
-        struct timeval *timeout_ptr = NULL;
+        struct timeval *timeout_ptr;
         
-        // If we had clients and all disconnected with no pending operations, use timeout
+        // Always use a timeout to periodically check async operations
+        // Use longer timeout if all clients disconnected, shorter if active
         if (had_clients && active_before == 0 && pending_before == 0) {
             timeout.tv_sec = 0;
-            timeout.tv_usec = 200000; // 200ms timeout
-            timeout_ptr = &timeout;
+            timeout.tv_usec = 200000; // 200ms timeout when all disconnected
         } else {
-            timeout_ptr = NULL; // Block indefinitely
+            timeout.tv_sec = 0;
+            timeout.tv_usec = 100000; // 100ms timeout to check async operations
         }
+        timeout_ptr = &timeout;
 
         int nready = select(server_fd + 1, &read_fds, NULL, NULL, timeout_ptr);
         if (nready == -1) {
