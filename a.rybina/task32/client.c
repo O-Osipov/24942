@@ -26,7 +26,13 @@ static ssize_t robust_write(int fd, const void *buf, size_t count) {
     return (ssize_t)count;
 }
 
-int main(void) {
+int main(int argc, char *argv[]) {
+    // Get client number from command line argument, default to "1"
+    const char *client_num = (argc > 1) ? argv[1] : "1";
+    char message[32];
+    snprintf(message, sizeof(message), "Client%s\n", client_num);
+    size_t message_len = strlen(message);
+
     int fd = socket(AF_UNIX, SOCK_STREAM, 0);
     if (fd == -1) {
         perror("socket");
@@ -43,9 +49,6 @@ int main(void) {
         close(fd);
         return 1;
     }
-
-    const char *message = "hello\n";
-    size_t message_len = strlen(message);
     struct timespec start_time, current_time;
 
     clock_gettime(CLOCK_MONOTONIC, &start_time);
