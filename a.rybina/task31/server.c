@@ -213,6 +213,10 @@ int main(void) {
     }
 
     if (server_started) {
+        const char *header = "\n=== SERVER SUMMARY ===\n";
+        if (robust_write(STDOUT_FILENO, header, strlen(header)) < 0) {
+            perror("write");
+        }
         long duration_ms =
             (last_event.tv_sec - first_event.tv_sec) * 1000L +
             (last_event.tv_nsec - first_event.tv_nsec) / 1000000L;
