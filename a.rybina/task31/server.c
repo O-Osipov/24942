@@ -75,6 +75,9 @@ int main(void) {
     FD_SET(listen_fd, &all_fds);
 
     int had_clients = 0;
+    int server_started = 0;
+    struct timespec first_event;
+    struct timespec last_event;
     char buffer[8192];
     struct timeval timeout;
     struct timeval *timeout_ptr = NULL;
@@ -165,6 +168,11 @@ int main(void) {
                     n = (ssize_t)write_pos;
                     if (n > 0) {
                         clock_gettime(CLOCK_MONOTONIC, &end_time);
+                        if (!server_started) {
+                            first_event = start_time;
+                            server_started = 1;
+                        }
+                        last_event = end_time;
                         long processing_us =
                             (end_time.tv_sec - start_time.tv_sec) * 1000000L +
                             (end_time.tv_nsec - start_time.tv_nsec) / 1000L;
@@ -201,6 +209,18 @@ int main(void) {
                     }
                 }
             }
+        }
+    }
+
+    if (server_started) {
+        long duration_ms =
+            (last_event.tv_sec - first_event.tv_sec) * 1000L +
+            (last_event.tv_nsec - first_event.tv_nsec) / 1000000L;
+        char duration_buf[128];
+        snprintf(duration_buf, sizeof(duration_buf),
+                 "[Server active duration: %ld ms]\n", duration_ms);
+        if (robust_write(STDOUT_FILENO, duration_buf, strlen(duration_buf)) < 0) {
+            perror("write");
         }
     }
 

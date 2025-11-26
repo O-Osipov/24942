@@ -78,6 +78,9 @@ int main(void) {
 
     client_info_t clients[MAX_CLIENTS];
     int had_clients = 0;
+    int server_started = 0;
+    struct timespec first_event;
+    struct timespec last_event;
 
     for (int i = 0; i < MAX_CLIENTS; i++) {
         clients[i].fd = -1;
@@ -178,6 +181,11 @@ int main(void) {
 
                     if (nbytes > 0) {
                         clock_gettime(CLOCK_MONOTONIC, &end_time);
+                        if (!server_started) {
+                            first_event = start_time;
+                            server_started = 1;
+                        }
+                        last_event = end_time;
                         long processing_us =
                             (end_time.tv_sec - start_time.tv_sec) * 1000000L +
                             (end_time.tv_nsec - start_time.tv_nsec) / 1000L;
@@ -243,6 +251,18 @@ int main(void) {
 
         if (had_clients && active_clients == 0 && pending_ops == 0) {
             break;
+        }
+    }
+
+    if (server_started) {
+        long duration_ms =
+            (last_event.tv_sec - first_event.tv_sec) * 1000L +
+            (last_event.tv_nsec - first_event.tv_nsec) / 1000000L;
+        char duration_buf[128];
+        snprintf(duration_buf, sizeof(duration_buf),
+                 "[Server active duration: %ld ms]\n", duration_ms);
+        if (robust_write(STDOUT_FILENO, duration_buf, strlen(duration_buf)) < 0) {
+            perror("write");
         }
     }
 
