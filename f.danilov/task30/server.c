@@ -7,6 +7,9 @@
 #include <ctype.h>
 
 int main() {
+
+    unlink("task30_socket");
+    
     int server_socket, client_socket;
     // адрес локкального сокета
     struct sockaddr_un server_addr, client_addr;
