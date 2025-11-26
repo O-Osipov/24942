@@ -73,7 +73,7 @@ int main(int argc, char *argv[]) {
             fprintf(stderr, "Partial write: wrote %zd of %zu bytes\n", bytes_written, message_len);
         }
 
-        struct timespec sleep_time = {0, 10000000}; // 10 ms in nanoseconds
+        struct timespec sleep_time = {0, 250000000}; // 250 ms -> 4 signals/sec
         nanosleep(&sleep_time, NULL);
     }
 
