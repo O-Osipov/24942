@@ -171,14 +171,10 @@ int main(void) {
                     clock_gettime(CLOCK_MONOTONIC, &start_time);
 
                     clients[i].buffer[nbytes] = '\0';
-                    size_t write_pos = 0;
                     for (ssize_t j = 0; j < nbytes; ++j) {
                         unsigned char ch = (unsigned char)clients[i].buffer[j];
-                        if (isalnum(ch) || isprint(ch)) {
-                            clients[i].buffer[write_pos++] = (char)(isalpha(ch) ? toupper(ch) : ch);
-                        }
+                        clients[i].buffer[j] = (char)(isalpha(ch) ? toupper(ch) : ch);
                     }
-                    nbytes = (ssize_t)write_pos;
 
                     if (nbytes > 0) {
                         clock_gettime(CLOCK_MONOTONIC, &end_time);
