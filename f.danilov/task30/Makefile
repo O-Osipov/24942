@@ -1,3 +1,10 @@
-all:
-	gcc -o client client.c 
-	gcc -o server server.c 
+UNAME_S := $(shell uname -s)
+ifeq ($(UNAME_S),SunOS)
+  LDLIBS = -lsocket -lnsl
+endif
+
+server: server.c
+client: client.c
+
+clean:
+	rm -f server client
