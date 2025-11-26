@@ -70,7 +70,8 @@ int main(void) {
             fprintf(stderr, "Partial write: wrote %zd of %zu bytes\n", bytes_written, message_len);
         }
 
-        usleep(10000); // Sleep for 10 ms
+        struct timespec sleep_time = {0, 10000000}; // 10 ms in nanoseconds
+        nanosleep(&sleep_time, NULL);
     }
 
     close(fd);
