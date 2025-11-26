@@ -4,11 +4,11 @@
 #include <string.h> 
 
 int main(void){
-    int fd[2];
+    int fd[2]; 
     pipe(fd); //создаем pipe: fd[0] - чтение, fd[1] - запись
     
     if (fork() == 0){
-        close(fd[1]); //закрываем конец для записи 
+        close(fd[1]); //закрываем конец для записи, ребенок не пишет, он читает 
         
         char buf[256];
         int n;
