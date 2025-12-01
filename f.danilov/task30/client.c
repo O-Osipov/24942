@@ -18,7 +18,7 @@ int main() {
     }
 
     server_addr.sun_family = AF_UNIX;
-    strcpy(server_addr.sun_path, "task30_socket");
+    strcpy(server_addr.sun_path, "task31_socket");
 
     // подключаемся к серверу
     if (connect(server_socket, (struct sockaddr *)&server_addr, sizeof(server_addr)) == -1) {
