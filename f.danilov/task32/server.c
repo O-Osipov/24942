@@ -178,7 +178,7 @@ int main() {
 
                     // Обработать все строки по \n
                     while (1) {
-                        char *newline = memchr(clients[client_idx].buf, '\n', clients[client_idx].buf_len);
+                        char *newline = memchr(clients[client_idx].buf, '!', clients[client_idx].buf_len);
                         if (!newline) break;
 
                         size_t line_len = newline - clients[client_idx].buf + 1;
@@ -186,7 +186,6 @@ int main() {
                             clients[client_idx].buf[j] = toupper((unsigned char)clients[client_idx].buf[j]);
                         }
                         write(STDOUT_FILENO, clients[client_idx].buf, line_len);
-                        clients[client_idx].messages_received++;
                         total_messages++;
                         memmove(clients[client_idx].buf, newline + 1, clients[client_idx].buf_len - line_len);
                         clients[client_idx].buf_len -= line_len;
