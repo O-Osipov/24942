@@ -62,17 +62,8 @@ int main() {
     struct sockaddr_un server_addr = {.sun_family = AF_UNIX};
     strncpy(server_addr.sun_path, SOCKET_PATH, sizeof(server_addr.sun_path) - 1);
 
-    if (bind(server_socket, (struct sockaddr *)&server_addr, sizeof(server_addr)) == -1) {
-        perror("bind");
-        close(server_socket);
-        exit(EXIT_FAILURE);
-    }
-
-    if (listen(server_socket, MAX_CLIENTS) == -1) {
-        perror("listen");
-        close(server_socket);
-        exit(EXIT_FAILURE);
-    }
+    bind(server_socket, (struct sockaddr *)&server_addr, sizeof(server_addr));
+    listen(server_socket, MAX_CLIENTS);
 
     struct timespec start_time;
     clock_gettime(CLOCK_MONOTONIC, &start_time);
@@ -118,15 +109,10 @@ int main() {
                 struct sockaddr_un client_addr;
                 socklen_t client_len = sizeof(client_addr);
                 int client_fd = accept4(server_socket, (struct sockaddr *)&client_addr, &client_len, SOCK_NONBLOCK);
-                if (client_fd == -1) {
-                    perror("accept4");
-                    continue;
-                }
 
                 int slot = find_free_slot();
-                if (slot == -1) {
-                    close(client_fd);
-                } else {
+                if (slot == -1) close(client_fd);
+                else {
                     clients[slot].fd = client_fd;
                     clients[slot].messages_received = 0;
                     clients[slot].buf_len = 0;
