@@ -9,7 +9,7 @@
 #include <sys/types.h>
 #include <time.h>
 
-#define SOCKET_PATH "task31_socket"
+#define SOCKET_PATH "task32_socket"
 
 void send_messages(int client_id) {
     int sock = socket(AF_UNIX, SOCK_STREAM, 0);
