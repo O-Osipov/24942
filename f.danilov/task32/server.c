@@ -65,8 +65,7 @@ int main() {
     bind(server_socket, (struct sockaddr *)&server_addr, sizeof(server_addr));
     listen(server_socket, MAX_CLIENTS);
 
-    struct timespec start_time;
-    clock_gettime(CLOCK_MONOTONIC, &start_time);
+    
     printf("Server listening on %s\n", SOCKET_PATH);
 
     init_clients();
@@ -91,8 +90,10 @@ int main() {
     }
 
     int completed_clients = 0;
-
+    struct timespec start_time;
+    
     while (1) {
+
         struct epoll_event events[MAX_EVENTS];
         int nfds = epoll_wait(epoll_fd, events, MAX_EVENTS, -1);
         if (nfds == -1) {
@@ -105,6 +106,8 @@ int main() {
             int fd = events[i].data.fd;
 
             if (fd == server_socket) {
+                
+                clock_gettime(CLOCK_MONOTONIC, &start_time);
                 // Новое подключение
                 struct sockaddr_un client_addr;
                 socklen_t client_len = sizeof(client_addr);
