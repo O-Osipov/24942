@@ -5,7 +5,7 @@
 #include <sys/socket.h>
 #include <sys/un.h>
 
-#define SOCKET_PATH "task32_socket"
+#define SOCKET_PATH "task31_socket"
 
 int main(int argc, char *argv[]) {
     if (argc != 2) {
