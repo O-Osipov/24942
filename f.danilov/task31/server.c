@@ -46,8 +46,7 @@ int main() {
         exit(EXIT_FAILURE);
     }
 
-    struct timespec start_time;
-    clock_gettime(CLOCK_MONOTONIC, &start_time);
+    
     printf("Server listening on %s\n", SOCKET_PATH);
 
     struct pollfd fds[MAX_CLIENTS + 1];
@@ -67,7 +66,7 @@ int main() {
     }
 
     int completed_count = 0;
-
+    struct timespec start_time;
     while (1) {
         int ready = poll(fds, nfds, -1);
         if (ready == -1) {
@@ -78,6 +77,8 @@ int main() {
 
         // Новое подключение
         if (fds[0].revents & POLLIN) {
+            
+            clock_gettime(CLOCK_MONOTONIC, &start_time);
             int client_fd = accept(server_fd, NULL, NULL);
             if (client_fd == -1) {
                 perror("accept");
