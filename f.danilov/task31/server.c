@@ -67,7 +67,7 @@ int main() {
 
     double elapsed = 0.0;
     const double RUN_DURATION = 10.0; // 5 секунд
-
+    int total_messages = 0;
     while (elapsed < RUN_DURATION) {
         // Вычисляем, сколько миллисекунд осталось
         struct timespec now;
@@ -150,6 +150,7 @@ int main() {
                         for (size_t j = 0; j < line_len; ++j) {
                             clients[i].buf[j] = toupper((unsigned char)clients[i].buf[j]);
                         }
+                        total_messages++;
                         write(STDOUT_FILENO, clients[i].buf, line_len);
                         clients[i].messages_received++;
 
@@ -166,13 +167,10 @@ int main() {
     double duration = (end_time.tv_sec - start_time.tv_sec) +
                      (end_time.tv_nsec - start_time.tv_nsec) / 1e9;
 
-    // Подсчёт общего числа сообщений
-    int total_messages = 0;
     for (int i = 0; i < MAX_CLIENTS; ++i) {
         if (clients[i].fd != -1) {
             close(clients[i].fd);
         }
-        total_messages += clients[i].messages_received;
     }
     printf("\n--- Server finished after %.3f seconds ---\n", duration);
     printf("Total messages processed: %d\n", total_messages);
