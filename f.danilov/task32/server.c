@@ -12,7 +12,7 @@
 
 #define SOCKET_PATH "task32_socket"
 #define MAX_CLIENTS 50          // ↑ увеличено для 10 сек
-#define BUFFER_SIZE 1024
+#define BUFFER_SIZE 2048
 #define MAX_EVENTS 10
 
 typedef struct {
