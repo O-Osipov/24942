@@ -48,6 +48,7 @@ int find_client_by_fd(int fd) {
 
 int main() {
     unlink(SOCKET_PATH);
+    int total_messages = 0;
 
     int server_socket = socket(AF_UNIX, SOCK_STREAM, 0);
     if (server_socket == -1) {
@@ -186,7 +187,7 @@ int main() {
                         }
                         write(STDOUT_FILENO, clients[client_idx].buf, line_len);
                         clients[client_idx].messages_received++;
-
+                        total_messages++;
                         memmove(clients[client_idx].buf, newline + 1, clients[client_idx].buf_len - line_len);
                         clients[client_idx].buf_len -= line_len;
                     }
@@ -201,12 +202,10 @@ int main() {
     double duration = (end_time.tv_sec - start_time.tv_sec) +
                      (end_time.tv_nsec - start_time.tv_nsec) / 1e9;
 
-    int total_messages = 0;
     for (int i = 0; i < MAX_CLIENTS; ++i) {
         if (clients[i].fd != -1) {
             close(clients[i].fd);
         }
-        total_messages += clients[i].messages_received;
     }
 
     close(server_socket);
