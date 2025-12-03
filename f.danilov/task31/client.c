@@ -1,51 +1,73 @@
+#define _GNU_SOURCE
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
 #include <sys/socket.h>
 #include <sys/un.h>
+#include <sys/wait.h>
+#include <sys/types.h>
+#include <time.h>
 
 #define SOCKET_PATH "task31_socket"
 
-int main(int argc, char *argv[]) {
-    if (argc != 2) {
-        fprintf(stderr, "Usage: %s <1|2>\n", argv[0]);
-        exit(EXIT_FAILURE);
-    }
-
-    int id = atoi(argv[1]);
-    if (id != 1 && id != 2) {
-        fprintf(stderr, "ID must be 1 or 2\n");
-        exit(EXIT_FAILURE);
-    }
-
+void send_messages(int client_id) {
     int sock = socket(AF_UNIX, SOCK_STREAM, 0);
-    if (sock == -1) {
-        perror("socket");
-        exit(EXIT_FAILURE);
-    }
+    if (sock == -1) return;
 
     struct sockaddr_un addr = {.sun_family = AF_UNIX};
     strncpy(addr.sun_path, SOCKET_PATH, sizeof(addr.sun_path) - 1);
 
     if (connect(sock, (struct sockaddr *)&addr, sizeof(addr)) == -1) {
-        perror("connect");
         close(sock);
-        exit(EXIT_FAILURE);
+        return;
     }
 
-    if (id == 1) {
-        char m1[] = "Client1 first message: Hello!\n";
-        char m2[] = "Client1 second message: How are you?\n";
-        write(sock, m1, strlen(m1));
-        write(sock, m2, strlen(m2));
-    } else {
-        char m1[] = "Client2 first message: Hi there!\n";
-        char m2[] = "Client2 second message: All good!\n";
-        write(sock, m1, strlen(m1));
-        write(sock, m2, strlen(m2));
-    }
+    // Получаем текущее время
+    struct timespec ts;
+    clock_gettime(CLOCK_MONOTONIC, &ts);
+    double current_time = ts.tv_sec + ts.tv_nsec / 1e9;
 
+    char msg1[256], msg2[256];
+    snprintf(msg1, sizeof(msg1), "Client%d message: Hello at %.3f sec!\n",
+             client_id, current_time);
+
+    write(sock, msg1, strlen(msg1));
     close(sock);
+}
+
+int main() {
+    struct timespec start, now;
+    clock_gettime(CLOCK_MONOTONIC, &start);
+
+    int iteration = 0; // счётчик итераций
+
+    while (1) {
+        clock_gettime(CLOCK_MONOTONIC, &now);
+        double elapsed = (now.tv_sec - start.tv_sec) +
+                        (now.tv_nsec - start.tv_nsec) / 1e9;
+        if (elapsed >= 10.0) break;
+
+
+        int client_id = (iteration % 3) + 1;
+
+        pid_t pid = fork();
+        if (pid == 0) {
+            send_messages(client_id);
+            exit(0);
+        } else if (pid > 0) {
+            iteration++;
+        } else {
+            perror("fork");
+            break;
+        }
+    }
+
+    // Дождаться завершения всех дочерних
+    int status;
+    while (waitpid(-1, &status, WNOHANG) > 0) {
+        // Собираем завершившиеся процессы
+    }
+
     return 0;
 }
