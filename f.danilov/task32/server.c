@@ -233,7 +233,7 @@ int main() {
                                 close(epoll_fd);
                                 unlink(SOCKET_PATH);
 
-                                printf("\nServer stopped. Total processing time: %.3f seconds\n", duration);
+                                printf("\nServer stopped. Total processing time: %.6f seconds\n", duration);
                                 return 0;
                             }
                             break;
