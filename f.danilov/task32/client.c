@@ -29,7 +29,7 @@ void send_messages(int client_id) {
     double current_time = ts.tv_sec + ts.tv_nsec / 1e9;
 
     char msg1[256], msg2[256];
-    snprintf(msg1, sizeof(msg1), "Client%d message: Hello at %.3f sec!\n",
+    snprintf(msg1, sizeof(msg1), "Client%d message: Hello at %.3f sec!",
              client_id, current_time);
 
     write(sock, msg1, strlen(msg1));
