@@ -161,7 +161,6 @@ int main() {
         }
     }
 
-    // ==== Завершение после 5 секунд ====
     struct timespec end_time;
     clock_gettime(CLOCK_MONOTONIC, &end_time);
     double duration = (end_time.tv_sec - start_time.tv_sec) +
@@ -175,7 +174,8 @@ int main() {
         }
         total_messages += clients[i].messages_received;
     }
-
+    printf("\n--- Server finished after %.3f seconds ---\n", duration);
+    printf("Total messages processed: %d\n", total_messages);
     close(server_fd);
     unlink(SOCKET_PATH);
     return 0;

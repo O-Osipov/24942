@@ -68,6 +68,5 @@ int main() {
     while (waitpid(-1, &status, WNOHANG) > 0) {
         // Собираем завершившиеся процессы
     }
-    printf("Number of messages: %d", iteration);
     return 0;
 }
