@@ -72,19 +72,53 @@ int main(void) {
             }
             continue; 
         }
-        if (isprint((unsigned char)c)){
-            if (col == MAXLEN){
-                write(1, "\n", 1);
-                len = 0;
-                col = 0; 
-                line[0] = '\0';    
-            } 
-            line[len++] = c; 
-            col++; 
-            write (1, &c, 1);
-            n += 1;
-            continue;
-        } else {
+       if (isprint((unsigned char)c)){
+
+    if (col == MAXLEN) {
+        // найти начало последнего слова в line[0..len-1]
+        int i = len - 1;
+        while (i >= 0 && !isspace((unsigned char)line[i])) {
+            i--;
+        }
+        int word_start = i + 1;
+        int word_len = len - word_start;
+
+        // сохраняем слово во временной буфер
+        char word_buf[MAXLEN + 1];
+        for (int j = 0; j < word_len; j++) {
+            word_buf[j] = line[word_start + j];
+        }
+        word_buf[word_len] = '\0';
+
+        // удалить это слово с текущей строки на экране
+        for (int j = 0; j < word_len; j++) {
+            write(1, "\b \b", 3);
+            col--;
+            len--;
+            n--;
+        }
+
+        // перенос строки
+        write(1, "\n", 1);
+        col = 0;
+        len = 0;     
+
+        // 5. Напечатать слово на новой строке и записать его в line
+        for (int j = 0; j < word_len; j++) {
+            char ch = word_buf[j];
+            write(1, &ch, 1);
+            line[len++] = ch;
+            col++;
+            n++;
+        }
+    }
+        // 6. теперь обычная печать текущего символа
+        line[len++] = c;
+        col++;
+        write(1, &c, 1);
+        n += 1;
+        continue;
+} else {
             write(1, "\a", 1); 
         }
         
