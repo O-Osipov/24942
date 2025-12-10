@@ -1,2 +1,2 @@
 #!/bin/sh
-yes xxx | head -c 3000 | ./client &
+yes x | head -c 3000 | ./client &
