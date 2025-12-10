@@ -63,8 +63,6 @@ int main()
 
     // Множество файловых дескрипторов для select
     fd_set readfds;
-    
-    char buffer[500];
 
     while (1)
     {
@@ -107,7 +105,6 @@ int main()
                 close(server_fd);
                 exit(EXIT_FAILURE);
             }
-            printf("Клиент подключен\n");
 
             // Добавляем клиента в массив
             int added = 0;
@@ -138,24 +135,20 @@ int main()
             // Если клиент активен, то читаем его
             if (fd != -1 && FD_ISSET(fd, &readfds)) 
             {
-                long bytes = read(fd, buffer, sizeof(buffer));
+                char symb; 
+                long bytes = read(fd, &symb, 1);
                 // Если клиент закончил, то отключаем его
                 if (bytes <= 0) 
                 {
-                    printf("Клиент отключился\n");
                     close(fd);
                     clients[i] = -1;
                     continue;
                 }
 
-                // Преобразуем в верхний регистр
-                for (int j = 0; j < bytes; j++) 
-                {
-                    buffer[j] = toupper(buffer[j]);
-                }
+                symb = toupper(symb);
 
                 // Печатаем результат
-                fwrite(buffer, 1, bytes, stdout);
+                printf("[C%d] %c\n", fd, symb);
                 fflush(stdout);
             }
         }

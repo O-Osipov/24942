@@ -75,7 +75,6 @@ int main()
             close(server_fd);
             exit(EXIT_FAILURE);
         }
-        printf("Клиент подключен\n");
 
         // Создаём новый процесс для каждого клиента
         pid_t pid = fork();
@@ -85,35 +84,19 @@ int main()
             // Закрываем серверный сокет в дочернем
             close(server_fd);
 
-            char buffer[500];
-            long bytes_read;
+            char symb;
 
             // Читаем данные от клиента и преобразуем в верхний регистр
-            while ((bytes_read = read(client_fd, buffer, 500)) > 0) 
+            while ((read(client_fd, &symb, 1)) > 0) 
             {
-                buffer[bytes_read] = '\0'; // Добавляем нулевой терминатор
-                
-                // Преобразуем в верхний регистр
-                for (int i = 0; i < bytes_read; i++) 
-                {
-                    buffer[i] = toupper(buffer[i]);
-                }
+                symb = toupper(symb);
                 
                 // Выводим результат
-                printf("%s", buffer);
+                printf("[PID %d] %c\n", getpid(), symb);
                 fflush(stdout);
             }
-            if (bytes_read == 0) 
-            {
-                printf("Клиент отключился\n");
-                close(client_fd);
-                exit(0); // завершаем дочерний процесс
-            }
-
-            else if (bytes_read == -1) 
-            {
-                perror("read");
-            }
+            close(client_fd);
+            exit(0);
         } 
         // Родительский процесс
         else if (pid > 0) 

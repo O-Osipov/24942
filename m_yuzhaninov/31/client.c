@@ -7,7 +7,7 @@
 
 #define SOCKET "/tmp/mysocket"
 
-int main() 
+int main(int argc, char *argv[]) 
 {
     int client_fd;
     
@@ -35,11 +35,26 @@ int main()
     }
     printf("Подключено к серверу. Введите текст (Ctrl+D для завершения):\n");
 
+
+    
+    char *text_to_send;
+    if (argc > 1 && strcmp(argv[1], "2") == 0) 
+    {
+        text_to_send = "AAAAAAAAAAAAAAAAAAAAAA";
+    }
+    else 
+    {
+        text_to_send = "BBBBBBBBBBBBBBBBBBBBBB";
+    }
+    
+    write(client_fd, text_to_send, strlen(text_to_send));
+
+    
     char buffer[500];
     long bytes_read;
     
     // Читаем ввод пользователя и отправляем серверу
-    while ((bytes_read = read(STDIN_FILENO, buffer, sizeof(buffer[500]))) > 0) 
+    while ((bytes_read = read(STDIN_FILENO, buffer, 500)) > 0) 
     {
         if (write(client_fd, buffer, bytes_read) != bytes_read) 
         {
