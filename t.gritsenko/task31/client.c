@@ -31,12 +31,14 @@ int main() {
 
     // Читаем данные из stdin и отправляем их на сервер через сокет
     while ((rc = read(STDIN_FILENO, buf, sizeof(buf))) > 0) {
-        for (int i = 0; i < rc; i++) {
-            if (write(fd, &buf[i], 1) != 1) {
+        // Передаём rc байт в сокет (fd)
+        if (write(fd, buf, rc) != rc) {
+            if (rc > 0) {
+                fprintf(stderr, "partial write"); // сокет записал не весь буфер
+            } else {
                 perror("write error");
-                exit(1);
+                exit(-1);
             }
-            usleep(1000); // 1 ms между байтами
         }
     }
 
