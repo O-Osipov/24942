@@ -7,7 +7,7 @@
 #include <ctype.h>
 #include <sys/select.h>
 
-#define SOCKET "/tmp/mysocket"
+#define SOCKET "./mysocket"
 
 int main() 
 {

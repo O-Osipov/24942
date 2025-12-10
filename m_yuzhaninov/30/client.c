@@ -5,7 +5,7 @@
 #include <sys/socket.h>
 #include <sys/un.h>
 
-#define SOCKET "/tmp/mysocket"
+#define SOCKET "./mysocket"
 
 int main() 
 {

@@ -8,7 +8,7 @@
 #include <signal.h>
 #include <sys/wait.h>
 
-#define SOCKET "/tmp/mysocket"
+#define SOCKET "./mysocket"
 
 // Чистим все завершившиеся процессы 
 void sigchld_handler(int signum) 
