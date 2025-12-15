@@ -17,7 +17,7 @@ echo "=== Запуск клиентов ==="
 # Клиент 1: шлёт X по одному символу
 (
   while true; do
-    printf "i am sync client"
+    printf "x"
     sleep 0.02
   done
 ) | ./client &
@@ -27,7 +27,7 @@ CLIENT1_PID=$!
 # Клиент 2: шлёт Y по одному символу
 (
   while true; do
-    printf "me sync client too"
+    printf "y"
     sleep 0.02
   done
 ) | ./client &
