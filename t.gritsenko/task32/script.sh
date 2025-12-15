@@ -1,33 +1,48 @@
-#!/usr/bin/env bash
-set -e
+#!/bin/bash
 
-SOCK="./socket"
+SOCKET=./socket
 
 echo "=== Очистка старого сокета ==="
-rm -f "$SOCK"
+rm -f $SOCKET
 
 echo "=== Запуск сервера ==="
-./server > server_out.txt 2>&1 &
-SPID=$!
+./server &
+SERVER_PID=$!
 
-# дать серверу подняться и создать/привязать сокет
-sleep 0.2
+# даём серверу подняться
+sleep 1
 
-echo "=== Запуск 2 spam-клиентов (мелкие порции) ==="
-# важное: маленькие порции + небольшие задержки -> больше шансов на перемешивание
-./client_spam x 3000 500 &
-C1=$!
-./client_spam y 3000 500 &
-C2=$!
+echo "=== Запуск клиентов ==="
 
-wait $C1 $C2
+# Клиент 1: шлёт X по одному символу
+(
+  while true; do
+    printf "x"
+    sleep 0.02
+  done
+) | ./client &
 
-echo "=== Остановка сервера ==="
-kill $SPID 2>/dev/null || true
-wait $SPID 2>/dev/null || true
+CLIENT1_PID=$!
 
-echo "=== Фрагмент вывода сервера (первые 200 символов) ==="
-# убираем переводы строк, чтобы увидеть "мешанину" в одной строке
-tr -d '\n' < server_out.txt | head -c 200
+# Клиент 2: шлёт Y по одному символу
+(
+  while true; do
+    printf "y"
+    sleep 0.02
+  done
+) | ./client &
+
+CLIENT2_PID=$!
+
+# Дать поработать
+sleep 3
+
 echo
-echo "=== Готово: полный вывод в server_out.txt ==="
+echo "=== Остановка ==="
+
+kill $CLIENT1_PID $CLIENT2_PID 2>/dev/null
+kill $SERVER_PID 2>/dev/null
+
+wait 2>/dev/null
+
+echo "=== Готово ==="
