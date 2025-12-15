@@ -1,34 +1,33 @@
-#!/bin/bash
+#!/usr/bin/env bash
+set -e
 
-SOCKET="./socket"
-SERVER="./server"
-CLIENT="./client"
+SOCK="./socket"
 
 echo "=== Очистка старого сокета ==="
-rm -f "$SOCKET"
+rm -f "$SOCK"
 
 echo "=== Запуск сервера ==="
-$SERVER &
-SERVER_PID=$!
-sleep 1
+./server > server_out.txt 2>&1 &
+SPID=$!
 
-echo "=== Запуск клиентов ==="
+# дать серверу подняться и создать/привязать сокет
+sleep 0.2
 
-# Клиент 1 — поток X без перевода строки
-( yes X | tr -d '\n' | head -c 500 | $CLIENT ) &
+echo "=== Запуск 2 spam-клиентов (мелкие порции) ==="
+# важное: маленькие порции + небольшие задержки -> больше шансов на перемешивание
+./client_spam x 3000 500 &
+C1=$!
+./client_spam y 3000 500 &
+C2=$!
 
-sleep 0.1
+wait $C1 $C2
 
-# Клиент 2 — поток Y без перевода строки
-( yes Y | tr -d '\n' | head -c 500 | $CLIENT ) &
+echo "=== Остановка сервера ==="
+kill $SPID 2>/dev/null || true
+wait $SPID 2>/dev/null || true
 
-# Даём им поработать
-sleep 2
-
+echo "=== Фрагмент вывода сервера (первые 200 символов) ==="
+# убираем переводы строк, чтобы увидеть "мешанину" в одной строке
+tr -d '\n' < server_out.txt | head -c 200
 echo
-echo "=== Остановка ==="
-
-kill $SERVER_PID 2>/dev/null
-wait
-
-echo "=== Готово ==="
+echo "=== Готово: полный вывод в server_out.txt ==="
