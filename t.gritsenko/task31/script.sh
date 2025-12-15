@@ -15,10 +15,10 @@ sleep 1
 echo "=== Запуск клиентов ==="
 
 # Клиент 1 — поток X без перевода строки
-( yes X | tr -d '\n' | head -c 200 | $CLIENT ) &
+( yes X | tr -d '\n' | head -c 500 | $CLIENT ) &
 
 # Клиент 2 — поток Y без перевода строки
-( yes Y | tr -d '\n' | head -c 200 | $CLIENT ) &
+( yes Y | tr -d '\n' | head -c 500 | $CLIENT ) &
 
 # Даём им поработать
 sleep 2
