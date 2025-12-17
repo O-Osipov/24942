@@ -1,4 +1,4 @@
-1 alpha
-2 beta
-3 gamma
-4 tetta
+1 one
+2 two
+3 three
+4 four
