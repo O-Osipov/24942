@@ -9,3 +9,5 @@
 !*.h
 !*.txt
 !.gitignore
+!Makefile
+!*.sh
