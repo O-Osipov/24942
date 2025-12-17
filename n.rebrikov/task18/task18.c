@@ -7,10 +7,11 @@
 #include <time.h>
 #include <string.h>
 #include <unistd.h>
+#include <dirent.h>
 
 void print_permissions(mode_t mode) 
 {
-    // Тип файла
+    // Тип файла  
     if (S_ISDIR(mode)) printf("d");
     else if (S_ISREG(mode)) printf("-");
     else if (S_ISLNK(mode)) printf("l");
@@ -36,6 +37,8 @@ void print_permissions(mode_t mode)
     printf("%c", (mode & S_IXOTH) ? 'x' : '-');
 }
 
+
+
 void print_file_info(const char *path) 
 {
     struct stat st;
@@ -60,13 +63,20 @@ void print_file_info(const char *path)
     printf(" %-8s", pw ? pw->pw_name : "?");
     printf(" %-8s", gr ? gr->gr_name : "?");
     
-    // Размер (только для обычных файлов)
+    // Размер для разных типов файлов
     if (S_ISREG(st.st_mode)) 
     {
+    // Обычный файл - показываем его размер
         printf(" %8ld", (long)st.st_size);
     } 
+    else if (S_ISDIR(st.st_mode))
+    {
+    // Директория - показываем размер метаданных (как в ls)
+        printf(" %8ld", (long)st.st_size);
+    }
     else 
     {
+    // Для других типов (символические ссылки и т.д.)
         printf(" %8s", "");
     }
     
@@ -76,7 +86,7 @@ void print_file_info(const char *path)
     strftime(time_buf, sizeof(time_buf), "%b %d %H:%M", tm_info);
     printf(" %s", time_buf);
     
-    // Имя файла (только последний компонент пути)
+    // Имя файла
     const char *filename = strrchr(path, '/');
     if (filename && *(filename + 1) != '\0') 
     {
