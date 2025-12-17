@@ -18,7 +18,7 @@ int main(int argc, char *argv[]) {
         wait(&stat_loc);
 
         if (WIFEXITED(stat_loc)) {
-            printf("\nChild process (pid: %d) finished with exit code %d\n", pid, WEXITSTATUS(stat_loc));
+            printf("\nParrent process (pid: %d) finished with exit code %d\n", pid, WEXITSTATUS(stat_loc));
         }
     }
 

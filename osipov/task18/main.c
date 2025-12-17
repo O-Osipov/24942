@@ -8,14 +8,8 @@
 #include <stdlib.h>
 #include <string.h>
 
-static void print_separator() {
-    printf("+---+-----------+------------+------------+------------+-----------------+------------------+\n");
-}
-
 static void print_header() {
-    print_separator();
-    printf("| T | PERMS     | USER       | GROUP      |       SIZE | MTIME           | NAME             |\n");
-    print_separator();
+    printf(" T  PERMS      USER        GROUP             SIZE  MTIME            NAME             \n");
 }
 
 static void print_file_info(const char *path) {
@@ -74,7 +68,7 @@ static void print_file_info(const char *path) {
     name = name ? name + 1 : path;
 
 
-    printf("| %-1.1c | %-9.9s | %-10.10s | %-10.10s | %10.10s | %-15.15s | %-16.16s |\n",
+    printf(" %-1.1c  %-9.9s  %-10.10s  %-10.10s  %10.10s  %-15.15s  %-16.16s \n",
            type, perms, user, group, sizebuf, timebuf, name);
 }
 
@@ -90,7 +84,6 @@ int main(int argc, char *argv[]) {
         print_file_info(argv[i]);
     }
 
-    print_separator();
 
     return 0;
 }

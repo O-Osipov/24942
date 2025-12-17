@@ -12,6 +12,7 @@ int main() {
     if (pid == -1) { return 1; }
 
     if (pid == 0) {
+        // дочерний
         close(fildes[1]);
 
         char c;
@@ -21,6 +22,7 @@ int main() {
 
         close(fildes[0]);
     } else {
+        // родительский
         close(fildes[0]);
 
         char *text = "Hello, World!\0";
