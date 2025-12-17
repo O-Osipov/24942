@@ -1,7 +1,7 @@
 #ignore all files
 *
 
-#unignore directoires
+#unignore directoires1
 !*/
 
 #unignore specified files
